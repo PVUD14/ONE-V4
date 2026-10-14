@@ -20,8 +20,8 @@ data class OnePalette(
     val bandBottom: Color,
     val bandInk: Color,
     val bandMuted: Color,
-    /** Tint for the wordmark on the band; null = keep the silver slices as-is. */
-    val wordmarkTint: Color?,
+    /** Which rendition of the ONE logo sits on the band (see [LogoSurface]). */
+    val logoOnBand: LogoSurface,
     // The content sheet under the band.
     val sheet: Color,
     val card: Color,
@@ -61,7 +61,7 @@ data class OnePalette(
 val NexusDark = OnePalette(
     id = "nexus", displayName = "Nexus Dark", dark = true,
     bandTop = Color(0xFF0B0C0F), bandBottom = Color(0xFF152238),
-    bandInk = Color(0xFFE8EAEF), bandMuted = Color(0xFF8E939C), wordmarkTint = null,
+    bandInk = Color(0xFFE8EAEF), bandMuted = Color(0xFF8E939C), logoOnBand = LogoSurface.Dark,
     sheet = Color(0xFF0E1523), card = Color(0xFF141C2E), cardBorder = Color(0xFF223048),
     ink = Color(0xFFE8EAEF), muted = Color(0xFF8E939C), outline = Color(0xFF223048),
     accent = Color(0xFF4D7DFF), accentDeep = Color(0xFF1F55E5), onAccent = Color.White,
@@ -72,7 +72,7 @@ val NexusDark = OnePalette(
 val AuroraViolet = OnePalette(
     id = "aurora", displayName = "Aurora Violet", dark = true,
     bandTop = Color(0xFF2A1058), bandBottom = Color(0xFF0B0714),
-    bandInk = Color(0xFFEDE9F7), bandMuted = Color(0xFFB4A8CE), wordmarkTint = null,
+    bandInk = Color(0xFFEDE9F7), bandMuted = Color(0xFFB4A8CE), logoOnBand = LogoSurface.Dark,
     sheet = Color(0xFF120A24), card = Color(0xFF1A1030), cardBorder = Color(0xFF33205C),
     ink = Color(0xFFEDE9F7), muted = Color(0xFF9C90B8), outline = Color(0xFF33205C),
     accent = Color(0xFFA855F7), accentDeep = Color(0xFFD946EF), onAccent = Color.White,
@@ -83,7 +83,7 @@ val AuroraViolet = OnePalette(
 val LuminaLight = OnePalette(
     id = "lumina", displayName = "Lumina Light", dark = false,
     bandTop = Color(0xFFFFFFFF), bandBottom = Color(0xFFFFFFFF),
-    bandInk = Color(0xFF0F172A), bandMuted = Color(0xFF64748B), wordmarkTint = Color(0xFF1A2233),
+    bandInk = Color(0xFF0F172A), bandMuted = Color(0xFF64748B), logoOnBand = LogoSurface.Light,
     sheet = Color(0xFFF6F8FB), card = Color(0xFFFFFFFF), cardBorder = null,
     ink = Color(0xFF0F172A), muted = Color(0xFF64748B), outline = Color(0xFFE7EBF0),
     accent = Color(0xFF1F55E5), accentDeep = Color(0xFF0A2B68), onAccent = Color.White,
@@ -94,7 +94,7 @@ val LuminaLight = OnePalette(
 val SilverLux = OnePalette(
     id = "silver", displayName = "Silver Lux", dark = true,
     bandTop = Color(0xFF0B0B0D), bandBottom = Color(0xFF101013),
-    bandInk = Color(0xFFDDDEE3), bandMuted = Color(0xFF8E8F98), wordmarkTint = null,
+    bandInk = Color(0xFFDDDEE3), bandMuted = Color(0xFF8E8F98), logoOnBand = LogoSurface.Dark,
     sheet = Color(0xFF0E0E10), card = Color(0xFF131316), cardBorder = Color(0xFF26262C),
     ink = Color(0xFFDDDEE3), muted = Color(0xFF8E8F98), outline = Color(0xFF26262C),
     accent = Color(0xFFE8E8EC), accentDeep = Color(0xFFA9AAB3), onAccent = Color(0xFF0B0B0D),
@@ -105,7 +105,7 @@ val SilverLux = OnePalette(
 val SunsetEmber = OnePalette(
     id = "ember", displayName = "Sunset Ember", dark = true,
     bandTop = Color(0xFF14100A), bandBottom = Color(0xFF1D130A),
-    bandInk = Color(0xFFF3EBE0), bandMuted = Color(0xFFB8A88E), wordmarkTint = null,
+    bandInk = Color(0xFFF3EBE0), bandMuted = Color(0xFFB8A88E), logoOnBand = LogoSurface.Dark,
     sheet = Color(0xFF16110B), card = Color(0xFF1D1710), cardBorder = Color(0xFF3A2B14),
     ink = Color(0xFFF3EBE0), muted = Color(0xFFB8A88E), outline = Color(0xFF3A2B14),
     accent = Color(0xFFF59E0B), accentDeep = Color(0xFFF97316), onAccent = Color(0xFF1A1206),
@@ -116,7 +116,11 @@ val SunsetEmber = OnePalette(
 val OceanGradient = OnePalette(
     id = "ocean", displayName = "Ocean Gradient", dark = false,
     bandTop = Color(0xFF1F55E5), bandBottom = Color(0xFF38BDF8),
-    bandInk = Color(0xFFFFFFFF), bandMuted = Color(0xCCFFFFFF), wordmarkTint = null,
+    // The logo is a white silhouette here rather than the silver-and-blue artwork.
+    // Untinted, the silver sits on a saturated blue at roughly the same luminance and the
+    // blue ring vanishes into the band — on the one surface where the brand should be
+    // clearest. Everything else on this band is already white, so the mark joins it.
+    bandInk = Color(0xFFFFFFFF), bandMuted = Color(0xCCFFFFFF), logoOnBand = LogoSurface.Mono,
     sheet = Color(0xFFF2F7FF), card = Color(0xFFFFFFFF), cardBorder = null,
     ink = Color(0xFF0F172A), muted = Color(0xFF64748B), outline = Color(0xFFE3ECFB),
     accent = Color(0xFF1F55E5), accentDeep = Color(0xFF38BDF8), onAccent = Color.White,

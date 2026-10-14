@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-interviews ai-loop" role="img" aria-label="Interviews (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiTalkA{0%,13%,100%{transform:none}6%{transform:scale(1.1)}}
+@keyframes aiTalkB{0%,12%,26%,100%{transform:none}19%{transform:scale(1.1)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-b1{animation:aiTalkA 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:4.6px 19px}
+.ai-loop .p-b2{animation:aiTalkB 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:19px 15px}
+}
+</style>
+<path class="f p-b1" fill-rule="evenodd" d="M2.5 10Q2.5 8.5 4 8.5L10.5 8.5Q12 8.5 13.06 9.56L13.54 10.04Q14.6 11.1 14.6 12.6L14.6 16.1Q14.6 17.6 13.1 17.6L9.7 17.6Q8.2 17.6 7.14 18.66L5.66 20.14Q4.6 21.2 4.6 19.7L4.6 18.65Q4.6 17.6 3.55 17.6L3.55 17.6Q2.5 17.6 2.5 16.55Z"/><g class="s"><path class="f p-b2" fill-rule="evenodd" d="M9 3.9Q9 2.6 10.3 2.6L17.7 2.6Q19 2.6 19.92 3.52L20.58 4.18Q21.5 5.1 21.5 6.4L21.5 12.45Q21.5 13.4 20.55 13.4L20.55 13.4Q19.6 13.4 19.6 14.35L19.6 15.1Q19.6 16.4 18.68 15.48L16.74 13.54Q16.6 13.4 16.4 13.4L16.4 13.4Q16.2 13.4 16.2 13.2L16.2 8.3Q16.2 7 14.9 7L10.3 7Q9 7 9 5.7Z"/></g>
+</svg>

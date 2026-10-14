@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlertTriangle, Building2, CalendarDays, CheckCircle2, ClipboardCheck, Download, FileText, MapPin, PenTool, Plus, TrendingUp, Users } from 'lucide-react';
+import { Icon, type IconName } from '../icons/Icon.js';
 import { Ring } from './pilotComponents.js';
 import { DetailRows, OverlayForm, useOverlay } from './pilotOverlay.js';
 import { usePilotSession } from './pilotSession.js';
@@ -61,16 +61,16 @@ export function InstitutionAssessments(): React.ReactElement {
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Assessments</h1><p>Schedule cohort assessments and track participation and outcomes.</p></div>
-        <button type="button" className="pilot-btn" onClick={(event) => { event.stopPropagation(); createAssessment(); }}><Plus size={15} /> Create Assessment</button>
+        <button type="button" className="pilot-btn" onClick={(event) => { event.stopPropagation(); createAssessment(); }}><Icon name="plus" size={16} /> Create Assessment</button>
       </div>
 
       <div className="pilot-row cols-4">
         {[
-          ['Scheduled', 3, 'blue', CalendarDays], ['Completed This Term', 12, 'green', CheckCircle2],
-          ['Average Score', 64, 'amber', TrendingUp], ['Participation', '88%', 'purple', Users],
-        ].map(([label, value, tone, Icon]) => (
+          ['Scheduled', 3, 'blue', 'calendar'], ['Completed This Term', 12, 'green', 'check'],
+          ['Average Score', 64, 'amber', 'analytics'], ['Participation', '88%', 'purple', 'students'],
+        ].map(([label, value, tone, glyph]) => (
           <section key={label as string} className="pilot-card pilot-kpi">
-            {(() => { const Component = Icon as typeof Users; return <span className={`pilot-tile ${tone as string}`}><Component size={17} /></span>; })()}
+            <span className={`pilot-tile ${tone as string}`}><Icon name={glyph as IconName} size={16} /></span>
             <div><b>{value as number}</b><small>{label as string}</small></div>
           </section>
         ))}
@@ -122,7 +122,7 @@ export function InstitutionAssessments(): React.ReactElement {
             'Students below 40 are flagged automatically for intervention.',
           ].map((note) => (
             <div key={note} className="pilot-list-row" style={{ padding: '8px 2px' }}>
-              <ClipboardCheck size={15} color="#1f55e5" style={{ flexShrink: 0 }} />
+              <Icon name="assessments" size={16} style={{ color: "#1f55e5", flexShrink: 0 }} />
               <small style={{ color: 'var(--p-ink-2)' }}>{note}</small>
             </div>
           ))}
@@ -135,11 +135,11 @@ export function InstitutionAssessments(): React.ReactElement {
 // --- Institution: Interventions -----------------------------------------------
 
 const INTERVENTION_ROWS = [
-  { student: 'Aditya Rao', registration: 'VIT2027-0644', initials: 'ADR', action: 'Career counselling session', owner: 'Prof. Meera Nair', due: '28 May', status: 'Open', tone: 'rose' },
-  { student: 'Rohit Verma', registration: 'VIT2027-0590', initials: 'RV', action: 'Aptitude improvement plan', owner: 'Prof. S. Raman', due: '30 May', status: 'Open', tone: 'amber' },
-  { student: 'Karthik Menon', registration: 'VIT2027-0521', initials: 'KM', action: 'Resume review with faculty', owner: 'Prof. Meera Nair', due: '2 Jun', status: 'In progress', tone: 'blue' },
-  { student: 'Divya Krishnan', registration: 'VIT2027-0307', initials: 'DK', action: 'Communication coaching', owner: 'Dr. L. Thomas', due: '5 Jun', status: 'In progress', tone: 'purple' },
-  { student: 'Suresh Babu', registration: 'VIT2027-0688', initials: 'SB', action: 'Mock interview practice', owner: 'Prof. S. Raman', due: 'Completed 12 May', status: 'Completed', tone: 'green' },
+  { student: 'Aditya Rao', registration: 'LIT2027-0644', initials: 'ADR', action: 'Career counselling session', owner: 'Prof. Meera Nair', due: '28 May', status: 'Open', tone: 'rose' },
+  { student: 'Rohit Verma', registration: 'LIT2027-0590', initials: 'RV', action: 'Aptitude improvement plan', owner: 'Prof. S. Raman', due: '30 May', status: 'Open', tone: 'amber' },
+  { student: 'Karthik Menon', registration: 'LIT2027-0521', initials: 'KM', action: 'Resume review with faculty', owner: 'Prof. Meera Nair', due: '2 Jun', status: 'In progress', tone: 'blue' },
+  { student: 'Divya Krishnan', registration: 'LIT2027-0307', initials: 'DK', action: 'Communication coaching', owner: 'Dr. L. Thomas', due: '5 Jun', status: 'In progress', tone: 'purple' },
+  { student: 'Suresh Babu', registration: 'LIT2027-0688', initials: 'SB', action: 'Mock interview practice', owner: 'Prof. S. Raman', due: 'Completed 12 May', status: 'Completed', tone: 'green' },
 ] as const;
 
 export function InstitutionInterventions(): React.ReactElement {
@@ -173,7 +173,7 @@ export function InstitutionInterventions(): React.ReactElement {
           ['Due', row.due],
           ['Status', row.status],
         ]} />
-        <p className="pilot-modal-text" style={{ marginTop: 12 }}>The full review adds session notes, readiness movement since assignment and a completion checklist.</p>
+        <p className="pilot-modal-text" style={{ marginTop: 12 }}>The full review adds session notes, readiness band movement since assignment and a completion checklist.</p>
         <div className="pilot-modal-actions">
           <button type="button" className="pilot-btn ghost" onClick={() => { overlay.closeModal(); overlay.toast(`${row.student}: follow-up reminder sent (sample).`); }}>Send Reminder</button>
           <button type="button" className="pilot-btn" onClick={overlay.closeModal}>Done</button>
@@ -185,16 +185,16 @@ export function InstitutionInterventions(): React.ReactElement {
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Interventions</h1><p>Structured support for students who need attention before the placement season.</p></div>
-        <button type="button" className="pilot-btn" onClick={(event) => { event.stopPropagation(); assignIntervention(); }}><Plus size={15} /> Assign Intervention</button>
+        <button type="button" className="pilot-btn" onClick={(event) => { event.stopPropagation(); assignIntervention(); }}><Icon name="plus" size={16} /> Assign Intervention</button>
       </div>
 
       <div className="pilot-row cols-4">
         {[
-          ['Needing Support', pilotCohort.atRisk, 'rose', AlertTriangle], ['Open', 4, 'amber', PenTool],
-          ['In Progress', 2, 'blue', TrendingUp], ['Completed This Term', 18, 'green', CheckCircle2],
-        ].map(([label, value, tone, Icon]) => (
+          ['Needing Support', pilotCohort.atRisk, 'rose', 'warning'], ['Open', 4, 'amber', 'edit'],
+          ['In Progress', 2, 'blue', 'analytics'], ['Completed This Term', 18, 'green', 'check'],
+        ].map(([label, value, tone, glyph]) => (
           <section key={label as string} className="pilot-card pilot-kpi">
-            {(() => { const Component = Icon as typeof Users; return <span className={`pilot-tile ${tone as string}`}><Component size={17} /></span>; })()}
+            <span className={`pilot-tile ${tone as string}`}><Icon name={glyph as IconName} size={16} /></span>
             <div><b>{value as number}</b><small>{label as string}</small></div>
           </section>
         ))}
@@ -240,12 +240,12 @@ export function InstitutionInterventions(): React.ReactElement {
         <h2>Why Interventions Work</h2>
         <div className="pilot-list">
           {[
-            '14 of 18 completed interventions lifted readiness above 55.',
+            '14 of 18 completed interventions moved the student up at least one readiness band.',
             'Aptitude plans show results within three weeks on average.',
             'Counselling first, then a concrete practice plan with a due date.',
           ].map((note) => (
             <div key={note} className="pilot-list-row" style={{ padding: '8px 2px' }}>
-              <TrendingUp size={15} color="#0d6b4f" style={{ flexShrink: 0 }} />
+              <Icon name="analytics" size={16} style={{ color: "#0d6b4f", flexShrink: 0 }} />
               <small style={{ color: 'var(--p-ink-2)' }}>{note}</small>
             </div>
           ))}
@@ -263,11 +263,11 @@ export function InstitutionInterventions(): React.ReactElement {
 // --- Employer: Offers ---------------------------------------------------------
 
 const OFFER_ROWS = [
-  { candidate: 'Sana Sheikh', initials: 'SS', college: 'Anna University', role: 'Graduate Software Engineer', sent: '18 May', expires: '1 Jun', status: 'Awaiting response', tone: 'amber' },
-  { candidate: 'Nikhil Joshi', initials: 'NJ', college: 'NIT Trichy', role: 'Software Engineer', sent: '12 May', expires: 'Accepted 16 May', status: 'Accepted', tone: 'green' },
-  { candidate: 'Ananya Das', initials: 'AD', college: 'VIT Chennai', role: 'SDE Intern', sent: '10 May', expires: 'Accepted 14 May', status: 'Accepted', tone: 'green' },
-  { candidate: 'Harish Kumar', initials: 'HK', college: 'SRM Chennai', role: 'QA Engineer', sent: '8 May', expires: 'Declined 12 May', status: 'Declined', tone: 'rose' },
-  { candidate: 'Meghna Rao', initials: 'MR', college: 'Anna University', role: 'Graduate Software Engineer', sent: 'Draft', expires: '—', status: 'Draft', tone: 'slate' },
+  { candidate: 'Sana Sheikh', initials: 'SS', college: 'Hillcrest University', role: 'Graduate Software Engineer', sent: '18 May', expires: '1 Jun', status: 'Awaiting response', tone: 'amber' },
+  { candidate: 'Nikhil Joshi', initials: 'NJ', college: 'Riverside College of Engineering', role: 'Software Engineer', sent: '12 May', expires: 'Accepted 16 May', status: 'Accepted', tone: 'green' },
+  { candidate: 'Ananya Das', initials: 'AD', college: 'Lakeview Institute', role: 'SDE Intern', sent: '10 May', expires: 'Accepted 14 May', status: 'Accepted', tone: 'green' },
+  { candidate: 'Harish Kumar', initials: 'HK', college: 'Coastal Engineering College', role: 'QA Engineer', sent: '8 May', expires: 'Declined 12 May', status: 'Declined', tone: 'rose' },
+  { candidate: 'Meghna Rao', initials: 'MR', college: 'Hillcrest University', role: 'Graduate Software Engineer', sent: 'Draft', expires: '—', status: 'Draft', tone: 'slate' },
 ] as const;
 
 interface ExtendedOffer {
@@ -318,16 +318,16 @@ export function EmployerOffers(): React.ReactElement {
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Offers</h1><p>Offers extended this season across your open roles.</p></div>
-        <button type="button" className="pilot-btn" onClick={(event) => { event.stopPropagation(); extendOffer(); }}><Plus size={15} /> Extend Offer</button>
+        <button type="button" className="pilot-btn" onClick={(event) => { event.stopPropagation(); extendOffer(); }}><Icon name="plus" size={16} /> Extend Offer</button>
       </div>
 
       <div className="pilot-row cols-4">
         {[
-          ['Offers Extended', pilotEmployerStats.offersExtended, 'blue', FileText], ['Accepted', pilotEmployerStats.hires, 'green', CheckCircle2],
-          ['Awaiting Response', 7, 'amber', CalendarDays], ['Declined', 2, 'rose', AlertTriangle],
-        ].map(([label, value, tone, Icon]) => (
+          ['Offers Extended', pilotEmployerStats.offersExtended, 'blue', 'offers'], ['Accepted', pilotEmployerStats.hires, 'green', 'check'],
+          ['Awaiting Response', 7, 'amber', 'calendar'], ['Declined', 2, 'rose', 'warning'],
+        ].map(([label, value, tone, glyph]) => (
           <section key={label as string} className="pilot-card pilot-kpi">
-            {(() => { const Component = Icon as typeof Users; return <span className={`pilot-tile ${tone as string}`}><Component size={17} /></span>; })()}
+            <span className={`pilot-tile ${tone as string}`}><Icon name={glyph as IconName} size={16} /></span>
             <div><b>{value as number}</b><small>{label as string}</small></div>
           </section>
         ))}
@@ -343,7 +343,7 @@ export function EmployerOffers(): React.ReactElement {
                   <span className="pilot-avatar">{offer.candidate.split(' ').map((word) => word[0]).join('').slice(0, 2).toUpperCase()}</span>
                   <span><strong>{offer.candidate}</strong><small>Joining proposed {offer.joining}</small></span>
                 </div></td>
-                <td>VIT Chennai</td>
+                <td>Lakeview Institute</td>
                 <td>{offer.role}</td>
                 <td><small>Just now</small></td>
                 <td><span className="pilot-chip purple">Sent</span></td>
@@ -378,7 +378,7 @@ export function EmployerOffers(): React.ReactElement {
         <h2>Expiring Soon</h2>
         <div className="pilot-list">
           <div className="pilot-list-row" style={{ padding: '8px 2px' }}>
-            <span className="pilot-tile amber" style={{ width: 32, height: 32 }}><CalendarDays size={14} /></span>
+            <span className="pilot-tile amber" style={{ width: 32, height: 32 }}><Icon name="calendar-small" size={16} /></span>
             <div className="grow"><strong style={{ fontSize: 12.5 }}>Sana Sheikh</strong><small>Offer expires 1 Jun - consider a follow-up</small></div>
           </div>
         </div>
@@ -395,7 +395,7 @@ export function EmployerCompany(): React.ReactElement {
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Company Profile</h1><p>How {company.name} appears to students and placement cells.</p></div>
-        <button type="button" className="pilot-btn ghost"><PenTool size={15} /> Edit Profile</button>
+        <button type="button" className="pilot-btn ghost"><Icon name="edit" size={16} /> Edit Profile</button>
       </div>
 
       <section className="pilot-card">
@@ -434,7 +434,7 @@ export function EmployerCompany(): React.ReactElement {
               'Learning budget for certifications and conferences',
             ].map((point) => (
               <div key={point} className="pilot-list-row" style={{ padding: '8px 2px' }}>
-                <CheckCircle2 size={15} color="#0d6b4f" style={{ flexShrink: 0 }} />
+                <Icon name="check" size={16} style={{ color: "#0d6b4f", flexShrink: 0 }} />
                 <small style={{ color: 'var(--p-ink-2)' }}>{point}</small>
               </div>
             ))}
@@ -449,7 +449,7 @@ export function EmployerCompany(): React.ReactElement {
             ['Bengaluru', '4 open roles'], ['Hyderabad', '1 open role'], ['Chennai', '1 open role'],
           ].map(([city, roles]) => (
             <div key={city} className="pilot-cat">
-              <span className="pilot-tile indigo" style={{ width: 32, height: 32 }}><MapPin size={14} /></span>
+              <span className="pilot-tile indigo" style={{ width: 32, height: 32 }}><Icon name="field" size={16} /></span>
               <div><strong>{city}</strong><small>{roles}</small></div>
             </div>
           ))}
@@ -458,6 +458,22 @@ export function EmployerCompany(): React.ReactElement {
     </div>
 
     <aside className="pilot-rail">
+      <section className="pilot-card">
+        <div className="pilot-card-head"><h2>Organisation Verification</h2><span className="pilot-chip green"><Icon name="trust-safety" size={16} /> Verified</span></div>
+        <div className="pilot-list">
+          {[
+            ['Access requested', 'Work email on the company domain · 2 Mar 2026'],
+            ['Company checks', 'Domain, registration (CIN) and website reviewed by ONE Operations'],
+            ['Verified', '4 Mar 2026 · roles can be published to colleges'],
+          ].map(([step, detail]) => (
+            <div key={step} className="pilot-list-row" style={{ padding: '8px 2px' }}>
+              <Icon name="check" size={16} style={{ color: "#0d6b4f", flexShrink: 0 }} />
+              <div className="grow"><strong style={{ fontSize: 12.5 }}>{step}</strong><small>{detail}</small></div>
+            </div>
+          ))}
+        </div>
+        <small style={{ display: 'block', marginTop: 8, color: 'var(--p-muted)' }}>Until an employer is verified, it cannot publish roles, see applicants or request campus drives.</small>
+      </section>
       <section className="pilot-card" style={{ textAlign: 'center' }}>
         <h2 style={{ textAlign: 'left' }}>Profile Completeness</h2>
         <Ring value={90} size={104} stroke={11} tone="blue" />
@@ -467,12 +483,12 @@ export function EmployerCompany(): React.ReactElement {
         <h2>Campus Presence</h2>
         <div className="pilot-list">
           {[
-            ['VIT Chennai', 'Drive on 22 May · 154 registered'],
-            ['NIT Trichy', 'Drive on 29 May · 96 registered'],
-            ['Anna University', 'Drive on 3 Jun · 72 registered'],
+            ['Lakeview Institute', 'Drive on 22 May · 154 registered'],
+            ['Riverside College of Engineering', 'Drive on 29 May · 96 registered'],
+            ['Hillcrest University', 'Drive on 3 Jun · 72 registered'],
           ].map(([campus, detail]) => (
             <div key={campus} className="pilot-list-row" style={{ padding: '8px 2px' }}>
-              <span className="pilot-tile blue" style={{ width: 32, height: 32 }}><Building2 size={14} /></span>
+              <span className="pilot-tile blue" style={{ width: 32, height: 32 }}><Icon name="company" size={16} /></span>
               <div className="grow"><strong style={{ fontSize: 12.5 }}>{campus}</strong><small>{detail}</small></div>
             </div>
           ))}
@@ -481,8 +497,8 @@ export function EmployerCompany(): React.ReactElement {
       <section className="pilot-card">
         <h2>Quick Actions</h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <button type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}><Download size={15} /> Download Company Deck</button>
-          <button type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}><Users size={15} /> Invite a Teammate</button>
+          <button type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}><Icon name="download" size={16} /> Download Company Deck</button>
+          <button type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}><Icon name="students" size={16} /> Invite a Teammate</button>
         </div>
       </section>
     </aside>

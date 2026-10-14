@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-moon ai-loop" role="img" aria-label="Dark mode (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiSpark{0%,26%,100%{transform:none}8%{transform:scale(.3) rotate(-45deg)}17%{transform:scale(1.3) rotate(20deg)}}
+@keyframes aiRock{0%,28%,100%{transform:none}8%{transform:rotate(-18deg)}17%{transform:rotate(8deg)}23%{transform:rotate(-2deg)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-moon{animation:aiRock 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:11px 12.8px}
+.ai-loop .p-tw{animation:aiSpark 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:18.6px 4.6px}
+}
+</style>
+<path class="f p-moon" fill-rule="evenodd" d="M19.1 14.11Q19.71 14.02 19.57 14.62L19.46 15.03Q19.27 15.81 18.92 16.53L18.81 16.74Q18.46 17.46 17.97 18.09L17.82 18.28Q17.33 18.91 16.72 19.43L16.53 19.58Q15.92 20.1 15.21 20.47L15 20.58Q14.3 20.96 13.53 21.18L13.3 21.25Q12.53 21.47 11.73 21.52L11.49 21.54Q10.69 21.59 9.9 21.48L9.66 21.45Q8.87 21.34 8.12 21.06L7.89 20.98Q7.14 20.71 6.46 20.29L6.26 20.16Q5.58 19.73 5.01 19.18L4.83 19.01Q4.26 18.46 3.81 17.79L3.68 17.59Q3.23 16.93 2.93 16.19L2.84 15.97Q2.54 15.23 2.4 14.44L2.36 14.2Q2.22 13.41 2.25 12.61L2.26 12.37Q2.29 11.58 2.48 10.8L2.54 10.57Q2.73 9.79 3.08 9.07L3.19 8.86Q3.54 8.14 4.03 7.51L4.18 7.32Q4.67 6.69 5.28 6.17L5.47 6.02Q6.08 5.5 6.79 5.13L7 5.02Q7.7 4.64 8.47 4.42L8.92 4.29Q9.47 4.13 10.05 4.12L10.05 4.12Q10.62 4.11 10.4 4.65L10.35 4.79Q10.07 5.47 9.94 6.19L9.94 6.19Q9.82 6.91 9.84 7.64L9.84 7.64Q9.87 8.37 10.05 9.08L10.05 9.08Q10.22 9.79 10.54 10.45L10.54 10.45Q10.86 11.11 11.31 11.69L11.31 11.69Q11.76 12.26 12.33 12.73L12.33 12.73Q12.89 13.2 13.53 13.55L13.53 13.55Q14.18 13.89 14.88 14.09L14.88 14.09Q15.58 14.29 16.31 14.34L16.31 14.34Q17.04 14.4 17.77 14.29L17.88 14.28Q18.49 14.19 19.1 14.11Z"/><g class="s"><path class="f p-tw" fill-rule="evenodd" d="M18.51 2.08Q18.6 1.8 18.69 2.08L19.21 3.62Q19.3 3.9 19.58 3.99L21.12 4.51Q21.4 4.6 21.12 4.69L19.58 5.21Q19.3 5.3 19.21 5.58L18.69 7.12Q18.6 7.4 18.51 7.12L17.99 5.58Q17.9 5.3 17.62 5.21L16.08 4.69Q15.8 4.6 16.08 4.51L17.62 3.99Q17.9 3.9 17.99 3.62Z"/></g>
+</svg>

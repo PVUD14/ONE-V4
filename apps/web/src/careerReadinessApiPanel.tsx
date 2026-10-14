@@ -1,17 +1,23 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ApiRequestError,
   completeCareerReadinessLesson,
   getCareerReadinessAccessToken,
   getCareerReadinessCatalog,
   getLearnerCareerReadinessState,
+  setLearnerLessonLanguage,
   startCareerReadinessAssessment,
   submitCareerReadinessAssessment,
   type AssessmentAttemptDto,
   type CareerReadinessCatalog,
   type LearnerCareerReadinessState,
+  type LearnerLessonLanguage,
 } from './api.js';
 import { V2EmptyState, V2Stat } from './dashboardsV2.js';
+import { lessonTextProps } from './lessonScript.js';
+import { formatDate, formatDateTime } from './dates.js';
+import { MISSING_TEXT } from './labels.js';
+import { ReadinessBand, toReadinessBand } from './momentum/readinessBand.js';
 
 type CareerRoute = 'readiness' | 'skills' | 'assessments' | 'learning' | 'roadmap' | 'notifications';
 
@@ -31,12 +37,12 @@ export function CareerReadinessApiPanel({ route }: { readonly route: CareerRoute
       if (token) {
         const state = await getLearnerCareerReadinessState(token, signal);
         setLearner(state);
-        setStatus('API-backed learner state is current.');
+        setStatus('Your progress is up to date.');
       } else {
-        setStatus('Published API content is available. Sign in to record learner progress.');
+        setStatus('Sign in to save your progress.');
       }
     } catch {
-      setStatus('Career Readiness API is unavailable. The demo preview below remains read-only and separate.');
+      setStatus('Career Readiness could not be loaded right now. Try again shortly.');
     }
   }
 
@@ -52,7 +58,7 @@ export function CareerReadinessApiPanel({ route }: { readonly route: CareerRoute
     try {
       await completeCareerReadinessLesson(token, lessonId);
       await refresh();
-      setStatus('Lesson completion and evidence were committed by the API.');
+      setStatus('Lesson completed and added to your evidence.');
     } catch (error) {
       // Prefer the API's named reason ("finish \"X\" first") over a generic line.
       if (error instanceof ApiRequestError && error.detail) {
@@ -60,6 +66,25 @@ export function CareerReadinessApiPanel({ route }: { readonly route: CareerRoute
       } else {
         setStatus('The lesson could not be completed. Check prerequisites and try again.');
       }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // ENG-16: the learner's lesson language. Lessons with no published version in it stay in English.
+  async function chooseLanguage(language: string): Promise<void> {
+    if (!token) return;
+    setBusy(true);
+    try {
+      const chosen = await setLearnerLessonLanguage(token, language);
+      await refresh();
+      const option = chosen.lessonLanguage.offered.find((entry) => entry.language === chosen.lessonLanguage.selected);
+      const name = option ? option.name : 'English';
+      setStatus(chosen.lessonLanguage.selected === 'en'
+        ? 'Lessons are shown in English.'
+        : `Lessons are shown in ${name} where a ${name} version is published. The rest are shown in English, and say so.`);
+    } catch {
+      setStatus('The lesson language could not be changed. Your lessons are unchanged.');
     } finally {
       setBusy(false);
     }
@@ -98,35 +123,103 @@ export function CareerReadinessApiPanel({ route }: { readonly route: CareerRoute
   return (
     <section className="career-api-panel" aria-labelledby="career-api-title">
       <div className="career-api-heading">
-        <div><span className="eyebrow">Published API content</span><h2 id="career-api-title">Career Readiness Fundamentals</h2></div>
-        <span className={`career-api-state ${catalog ? 'connected' : 'unavailable'}`}>{catalog ? 'API-backed' : 'API unavailable'}</span>
+        <div><span className="eyebrow">Career Readiness</span><h2 id="career-api-title">Career Readiness Fundamentals</h2></div>
+        <span className={`career-api-state ${catalog ? 'connected' : 'unavailable'}`}>{catalog ? 'Up to date' : 'Unavailable'}</span>
       </div>
       <p className="career-api-status" role="status" aria-live="polite">{status}</p>
-      {route === 'learning' ? <LearningApiView catalog={catalog} learner={learner} token={token} busy={busy} onComplete={complete} /> : null}
+      {route === 'learning' ? <LearningApiView catalog={learner ? learner.catalog : catalog} learner={learner} token={token} busy={busy}
+        onComplete={complete} onChooseLanguage={chooseLanguage} /> : null}
       {route === 'assessments' ? <AssessmentApiView catalog={catalog} learner={learner} token={token} busy={busy} attempt={attempt}
         selectedOptions={selectedOptions} onSelect={(questionId, optionId) => setSelectedOptions((current) => ({ ...current, [questionId]: optionId }))}
         onStart={start} onSubmit={submit} /> : null}
-      {learner && route !== 'notifications' ? <CareerStatStrip learner={learner} catalog={catalog} /> : null}
-      {route === 'readiness' ? <ReadinessApiView learner={learner} /> : null}
-      {route === 'skills' ? <SkillsApiView learner={learner} /> : null}
+      {/* Readiness is about the advisory band; Skills about each topic's mastery, so it has its own strip. */}
+      {learner && route !== 'notifications' && route !== 'skills' ? <CareerStatStrip learner={learner} catalog={catalog} /> : null}
+      {route === 'readiness' ? <ReadinessApiView learner={learner} catalog={learner ? learner.catalog : catalog} /> : null}
+      {route === 'skills' ? <SkillsApiView learner={learner} catalog={learner ? learner.catalog : catalog} /> : null}
       {route === 'roadmap' ? <RoadmapApiView learner={learner} /> : null}
       {route === 'notifications' ? <NotificationsApiView learner={learner} /> : null}
-      <p className="career-api-boundary">Named bands are advisory, never employer-visible, and derived only from versioned ONE evidence. The preview content below is not written to the API.</p>
+      <p className="career-api-boundary">Readiness bands are advice for you. They are never shown to employers and come only from the evidence you build in ONE.</p>
     </section>
   );
 }
 
-function LearningApiView({ catalog, learner, token, busy, onComplete }: {
-  readonly catalog: CareerReadinessCatalog | null; readonly learner: LearnerCareerReadinessState | null; readonly token: string | null;
-  readonly busy: boolean; readonly onComplete: (lessonId: string) => void;
+/** The lesson the address asks for (/student/learning?lesson=<id>), if any. */
+function requestedLessonId(): string | null {
+  if (typeof window === 'undefined') return null;
+  return new URLSearchParams(window.location.search).get('lesson');
+}
+
+type CatalogLesson = NonNullable<CareerReadinessCatalog['modules']>[number]['lessons'][number];
+
+/** One published lesson: the same card in the list and when the page is opened on it. */
+function LessonCard({ lesson, done, token, busy, chosenName, onComplete }: {
+  readonly lesson: CatalogLesson; readonly done: boolean; readonly token: string | null; readonly busy: boolean;
+  readonly chosenName: string; readonly onComplete: (lessonId: string) => void;
 }): React.ReactElement {
-  const completed = new Set(learner?.progress.filter((item) => item.state === 'COMPLETED').map((item) => item.lessonVersionId) ?? []);
-  return <div className="career-api-grid">{catalog?.modules.flatMap((module) => module.lessons).map((lesson) => (
-    <article key={lesson.id}><span>{completed.has(lesson.id) ? 'Completed with evidence' : 'Published lesson'}</span><h3>{lesson.title}</h3>
-      <p>{lesson.body.summary}</p><small>{lesson.prerequisiteLessonIds.length ? `${lesson.prerequisiteLessonIds.length} prerequisite` : 'No prerequisite'}</small>
-      <button type="button" disabled={!token || busy || completed.has(lesson.id)} onClick={() => onComplete(lesson.id)}>{completed.has(lesson.id) ? 'Completed' : 'Complete lesson'}</button>
-    </article>
-  )) ?? null}</div>;
+  return <>
+    <span>{done ? 'Completed with evidence' : 'Published lesson'}</span>
+    <h3 {...lessonTextProps(lesson.language)}>{lesson.title}</h3>
+    <p {...lessonTextProps(lesson.language)}>{lesson.body.summary}</p>
+    {lesson.languageNotice === 'TRANSLATION_MISSING' ? <small role="note">Not yet available in {chosenName}. Shown in English.</small> : null}
+    {lesson.languageNotice === 'TRANSLATION_OUTDATED' ? <small role="note">The English lesson was updated after this {chosenName} version was written. Choose English to read the latest.</small> : null}
+    <small>{lesson.prerequisiteLessonIds.length ? `${lesson.prerequisiteLessonIds.length} prerequisite` : 'No prerequisite'}</small>
+    <button type="button" disabled={!token || busy || done} onClick={() => onComplete(lesson.id)}>{done ? 'Completed' : 'Complete lesson'}</button>
+  </>;
+}
+
+/** The lesson the page was opened on, first and in view, so "Resume lesson" lands on it. */
+function OpenedLesson({ children, title }: { readonly children: React.ReactNode; readonly title: string }): React.ReactElement {
+  const ref = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    node.focus({ preventScroll: true });
+    if (typeof node.scrollIntoView === 'function') node.scrollIntoView({ block: 'start', behavior: 'auto' });
+  }, []);
+  return <article ref={ref} tabIndex={-1} className="career-api-opened" aria-label={`Your lesson: ${title}`}>{children}</article>;
+}
+
+function LearningApiView({ catalog, learner, token, busy, onComplete, onChooseLanguage }: {
+  readonly catalog: CareerReadinessCatalog | null; readonly learner: LearnerCareerReadinessState | null; readonly token: string | null;
+  readonly busy: boolean; readonly onComplete: (lessonId: string) => void; readonly onChooseLanguage: (language: string) => void;
+}): React.ReactElement {
+  const completed = new Set(learner?.progress?.filter((item) => item.state === 'COMPLETED').map((item) => item.lessonVersionId) ?? []);
+  const lessonLanguage = learner && learner.lessonLanguage ? learner.lessonLanguage : null;
+  const chosenName = lessonLanguageName(lessonLanguage);
+  const lessons = (catalog?.modules ?? []).flatMap((module) => module.lessons);
+  const wanted = requestedLessonId();
+  const opened = wanted ? lessons.find((lesson) => lesson.id === wanted) ?? null : null;
+  return <>
+    {opened ? <OpenedLesson title={opened.title}>
+      <LessonCard lesson={opened} done={completed.has(opened.id)} token={token} busy={busy} chosenName={chosenName} onComplete={onComplete} />
+    </OpenedLesson> : null}
+    {token && lessonLanguage ? <LessonLanguagePicker lessonLanguage={lessonLanguage} busy={busy} onChoose={onChooseLanguage} /> : null}
+    <div className="career-api-grid">{lessons.filter((lesson) => lesson.id !== opened?.id).map((lesson) => (
+      <article key={lesson.id}><LessonCard lesson={lesson} done={completed.has(lesson.id)} token={token} busy={busy} chosenName={chosenName} onComplete={onComplete} /></article>
+    ))}</div>
+  </>;
+}
+
+function lessonLanguageName(lessonLanguage: LearnerLessonLanguage | null): string {
+  const option = lessonLanguage ? lessonLanguage.offered.find((entry) => entry.language === lessonLanguage.selected) : undefined;
+  return option ? option.name : 'English';
+}
+
+/**
+ * ENG-16: the learner chooses the language lessons are shown in. Each language is named in its own
+ * script beside its English name. Completing a lesson counts the same in any language.
+ */
+function LessonLanguagePicker({ lessonLanguage, busy, onChoose }: {
+  readonly lessonLanguage: LearnerLessonLanguage; readonly busy: boolean; readonly onChoose: (language: string) => void;
+}): React.ReactElement {
+  return <div className="career-api-heading">
+    <label><span>Lesson language</span>{' '}
+      <select aria-label="Lesson language" value={lessonLanguage.selected} disabled={busy} onChange={(event) => onChoose(event.target.value)}>
+        {lessonLanguage.offered.map((option) => <option key={option.language} value={option.language} {...lessonTextProps(option.language)}>
+          {option.nativeName === option.name ? option.name : `${option.nativeName} · ${option.name}`}</option>)}
+      </select></label>
+    <small>A lesson with no published version in your language is shown in English, and says so. Completing a lesson counts the same in any language.</small>
+  </div>;
 }
 
 function AssessmentApiView({ catalog, learner, token, busy, attempt, selectedOptions, onSelect, onStart, onSubmit }: {
@@ -135,20 +228,30 @@ function AssessmentApiView({ catalog, learner, token, busy, attempt, selectedOpt
   readonly onSelect: (questionId: string, optionId: string) => void; readonly onStart: (assessmentId: string) => void; readonly onSubmit: () => void;
 }): React.ReactElement {
   if (attempt) return <form className="career-assessment-form" onSubmit={(event) => { event.preventDefault(); void onSubmit(); }}>
-    <p>Expires {new Date(attempt.expiresAt).toLocaleString()}. Answer keys and scoring logic remain server-side.</p>
+    <p>Expires {formatDateTime(attempt.expiresAt)}. Answers are checked after you submit.</p>
     {attempt.questions.map((question, index) => <fieldset key={question.id}><legend>{index + 1}. {question.prompt}</legend>
       {question.options.map((option) => <label key={option.id}><input type="radio" name={question.id} value={option.id}
         checked={selectedOptions[question.id] === option.id} onChange={() => onSelect(question.id, option.id)} />{option.text}</label>)}</fieldset>)}
     <button type="submit" disabled={busy || attempt.questions.some((question) => !selectedOptions[question.id])}>Submit assessment once</button>
   </form>;
-  return <div className="career-api-grid">{catalog?.assessments.map((assessment) => <article key={assessment.id}><span>Published assessment</span>
-    <h3>{assessment.title}</h3><p>{assessment.selectionCount} questions · {Math.round(assessment.timeLimitSeconds / 60)} minutes · one attempt</p>
-    <button type="button" disabled={!token || busy || Boolean(learner?.attempts.length)} onClick={() => onStart(assessment.id)}>Start assessment</button>
-  </article>) ?? null}</div>;
+  // The server allows one attempt per assessment. This previously disabled every
+  // assessment as soon as the learner had attempted any one of them, which is a
+  // stricter rule than the server's and made readiness effectively impossible to
+  // exercise or regression-test. Now each card reflects only its own assessment.
+  const attemptedAssessments = new Set((learner?.attempts ?? [])
+    .map((attempt) => attempt.assessmentDefinitionId).filter((id): id is string => Boolean(id)));
+  return <div className="career-api-grid">{(catalog?.assessments ?? []).map((assessment) => {
+    const alreadyAttempted = attemptedAssessments.has(assessment.id);
+    return <article key={assessment.id}><span>Published assessment</span>
+      <h3>{assessment.title}</h3><p>{assessment.selectionCount} questions · {Math.round(assessment.timeLimitSeconds / 60)} minutes · one attempt</p>
+      <button type="button" disabled={!token || busy || alreadyAttempted} onClick={() => onStart(assessment.id)}>
+        {alreadyAttempted ? 'Already attempted' : 'Start assessment'}</button>
+    </article>;
+  }) ?? null}</div>;
 }
 
 function CareerStatStrip({ learner, catalog }: { readonly learner: LearnerCareerReadinessState; readonly catalog: CareerReadinessCatalog | null }): React.ReactElement {
-  const lessons = catalog?.modules.flatMap((module) => module.lessons) ?? [];
+  const lessons = (catalog?.modules ?? []).flatMap((module) => module.lessons);
   const completed = learner.progress.filter((item) => item.state === 'COMPLETED').length;
   const scored = learner.attempts.filter((item) => typeof item.scoreCorrect === 'number');
   return (
@@ -161,30 +264,59 @@ function CareerStatStrip({ learner, catalog }: { readonly learner: LearnerCareer
   );
 }
 
-function ReadinessApiView({ learner }: { readonly learner: LearnerCareerReadinessState | null }): React.ReactElement {
-  return learner?.readiness ? <div className="career-readiness-result"><span>Current advisory band</span><strong>{formatBand(learner.readiness.band)}</strong>
-    <p>Based on {learner.evidence.length} immutable evidence record{learner.evidence.length === 1 ? '' : 's'}. No personal readiness history is shown.</p></div>
-    : <V2EmptyState icon="📈" title="No advisory band yet"
-      note="Complete learning and the published assessment to create enough evidence. Bands are advisory and never employer-visible." />;
+function topicName(catalog: CareerReadinessCatalog | null, topicId: string): string {
+  return catalog?.topics?.find((topic) => topic.id === topicId)?.name ?? MISSING_TEXT;
 }
 
-function SkillsApiView({ learner }: { readonly learner: LearnerCareerReadinessState | null }): React.ReactElement {
-  return <div className="career-api-grid">{learner?.mastery.map((mastery) => <article key={mastery.id}><span>Evidence-derived mastery</span>
-    <h3>{formatBand(mastery.band)}</h3><p>{mastery.evidenceIds.length} active evidence record{mastery.evidenceIds.length === 1 ? '' : 's'}.</p></article>) ?? null}</div>;
+/** Readiness: the advisory band, what it rests on, and the bands it has been before. Bands only, never a number. */
+function ReadinessApiView({ learner, catalog }: { readonly learner: LearnerCareerReadinessState | null; readonly catalog: CareerReadinessCatalog | null }): React.ReactElement {
+  if (!learner?.readiness) return <V2EmptyState icon="📈" title="No advisory band yet"
+    note="Complete learning and the published assessment to create enough evidence. Bands are advisory and never employer-visible." />;
+  const factors = learner.readiness.explanation.factors ?? [];
+  const history = learner.readinessHistory ?? [];
+  return <>
+    <div className="career-readiness-result"><span>Current advisory band</span><strong>{formatBand(learner.readiness.band)}</strong>
+      <ReadinessBand band={toReadinessBand(learner.readiness.band)} variant="compact" />
+      <p>Based on {learner.evidence.length} immutable evidence record{learner.evidence.length === 1 ? '' : 's'}.</p></div>
+    <div className="career-api-grid">{factors.length ? factors.map((factor) => <article key={factor.topicId}><span>What this band rests on</span>
+      <h3>{topicName(catalog, factor.topicId)}</h3><p>{formatBand(factor.masteryBand)}. {factor.explanation}</p></article>)
+      : <article><span>What this band rests on</span><p>No topic-level explanation was recorded with this band.</p></article>}</div>
+    <div className="career-api-grid">{history.length ? history.slice(0, 6).map((entry) => <article key={entry.id}><span>Band on {new Date(entry.generatedAt).toLocaleDateString()}</span>
+      <h3>{formatBand(entry.band)}</h3></article>)
+      : <article><span>Band history</span><p>No earlier band has been recorded for you yet.</p></article>}</div>
+  </>;
+}
+
+/** Skills: each topic's evidence-derived mastery, named, with the evidence behind it. */
+function SkillsApiView({ learner, catalog }: { readonly learner: LearnerCareerReadinessState | null; readonly catalog: CareerReadinessCatalog | null }): React.ReactElement {
+  const mastery = learner?.mastery ?? [];
+  const topics = catalog?.topics ?? [];
+  return <>
+    <div className="v2-row v2-cols-4 career-stat-strip">
+      {/* A figure whose source has not loaded is passed as null, and V2Stat does not draw it. */}
+      <V2Stat icon="🧩" tone="purple" value={catalog ? topics.length : null} label="Skills in this pathway" />
+      <V2Stat icon="🎯" tone="green" value={learner ? mastery.length : null} label="Skills with evidence" />
+      <V2Stat icon="🧾" tone="blue" value={learner ? learner.evidence.length : null} label="Evidence records" />
+      <V2Stat icon="📌" tone="amber" value={catalog && learner ? Math.max(topics.length - mastery.length, 0) : null} label="Skills not yet evidenced" />
+    </div>
+    {mastery.length ? <div className="career-api-grid">{mastery.map((entry) => <article key={entry.id}><span>{topicName(catalog, entry.topicId)}</span>
+      <h3>{formatBand(entry.band)}</h3><p>{entry.evidenceIds.length} active evidence record{entry.evidenceIds.length === 1 ? '' : 's'}.</p></article>)}</div>
+      : <V2EmptyState icon="🧩" title="No skill evidence yet" note="Lessons and assessments you complete become evidence for each skill here." />}
+  </>;
 }
 
 function RoadmapApiView({ learner }: { readonly learner: LearnerCareerReadinessState | null }): React.ReactElement {
-  if (!learner?.roadmap.length) return <V2EmptyState icon="🗺️" title="No next action yet"
-    note="Advisory next actions appear here after your versioned evidence is evaluated — complete lessons and assessments to generate them." />;
+  if (!learner?.roadmap?.length) return <V2EmptyState icon="🗺️" title="No next action yet"
+    note="Suggested next steps appear here once you have completed lessons and assessments." />;
   return <div className="career-api-grid">{learner.roadmap.map((action) => <article key={action.id}><span>Advisory next action</span>
     <h3>{formatBand(action.actionCode)}</h3><p>Reason: {formatBand(action.reasonCode)}. State: {formatBand(action.state)}.</p>
-    {action.dueAt ? <small>Due {new Date(action.dueAt).toLocaleDateString()}</small> : null}</article>)}</div>;
+    {action.dueAt ? <small>Due {formatDate(action.dueAt)}</small> : null}</article>)}</div>;
 }
 
 function NotificationsApiView({ learner }: { readonly learner: LearnerCareerReadinessState | null }): React.ReactElement {
   const preference = learner?.notificationPreferences;
   return <><p className="career-api-status">Email is {preference?.emailEnabled ? 'enabled' : 'not enabled'}; daily cap {preference?.dailyCap ?? 0}. Destinations stay server-side.</p>
-    <div className="career-api-grid">{learner?.notifications.map((notification) => <article key={notification.id}><span>Native email command</span>
+    <div className="career-api-grid">{learner?.notifications?.map((notification) => <article key={notification.id}><span>Native email command</span>
       <h3>{formatBand(notification.templateKey)}</h3><p>{notification.legalPurpose}</p><small>{formatBand(notification.state)}</small></article>) ?? null}</div></>;
 }
 

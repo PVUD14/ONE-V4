@@ -70,6 +70,16 @@ export function getAuthStatus(): AuthStatus {
   return { state: 'anonymous', config };
 }
 
+/**
+ * True when this tab holds a saved session whose access token has run out. Read it before
+ * restoreAuthenticatedSession (which clears such a session): when the restore then ends signed
+ * out, the app shows "Your session has expired" rather than a plain sign-in prompt (re-skin phase 8).
+ */
+export function hasExpiredStoredSession(): boolean {
+  const persisted = readPersistedSession();
+  return Boolean(persisted && persisted.accessTokenExpiresAt <= Date.now() + 30_000);
+}
+
 export function hasStoredAuthSession(): boolean {
   return window.sessionStorage.getItem(sessionKey) !== null;
 }
@@ -113,6 +123,61 @@ export async function signInWithPassword(username: string, password: string): Pr
   } catch (error) {
     return mapCognitoError(error);
   }
+}
+
+/**
+ * Self-service password reset. Cognito emails a one-time code; the person enters it with a new
+ * password. "No such account" collapses into the same answer as success, so the reset form never
+ * tells a visitor which addresses have accounts on ONE.
+ */
+export type PasswordResetResult =
+  | { readonly state: 'code_sent' }
+  | { readonly state: 'reset' }
+  | { readonly state: 'code_invalid' }
+  | { readonly state: 'code_expired' }
+  | { readonly state: 'password_rejected' }
+  | { readonly state: 'rate_limited' }
+  | { readonly state: 'unconfigured' }
+  | { readonly state: 'error' };
+
+export async function requestPasswordReset(username: string): Promise<PasswordResetResult> {
+  const config = getCognitoHostedUiConfig();
+  if (!config?.userPoolId) return { state: 'unconfigured' };
+  const user = new CognitoUser({ Username: username.trim(), Pool: createUserPool(config), Storage: sessionScopedCognitoStorage });
+  try {
+    await new Promise<void>((resolve, reject) => {
+      user.forgotPassword({ onSuccess: () => resolve(), onFailure: (error) => reject(error), inputVerificationCode: () => resolve() });
+    });
+    return { state: 'code_sent' };
+  } catch (error) {
+    return mapPasswordResetError(error, 'code_sent');
+  }
+}
+
+export async function confirmPasswordReset(username: string, code: string, newPassword: string): Promise<PasswordResetResult> {
+  const config = getCognitoHostedUiConfig();
+  if (!config?.userPoolId) return { state: 'unconfigured' };
+  const user = new CognitoUser({ Username: username.trim(), Pool: createUserPool(config), Storage: sessionScopedCognitoStorage });
+  try {
+    await new Promise<void>((resolve, reject) => {
+      user.confirmPassword(code.trim(), newPassword, { onSuccess: () => resolve(), onFailure: (error) => reject(error) });
+    });
+    return { state: 'reset' };
+  } catch (error) {
+    return mapPasswordResetError(error, 'code_invalid');
+  }
+}
+
+function mapPasswordResetError(error: unknown, unknownAccount: 'code_sent' | 'code_invalid'): PasswordResetResult {
+  const code = typeof error === 'object' && error !== null && 'code' in error ? String((error as { code?: unknown }).code) : '';
+  const name = typeof error === 'object' && error !== null && 'name' in error ? String((error as { name?: unknown }).name) : '';
+  const value = code || name;
+  if (value === 'UserNotFoundException' || value === 'NotAuthorizedException') return { state: unknownAccount };
+  if (value === 'CodeMismatchException') return { state: 'code_invalid' };
+  if (value === 'ExpiredCodeException') return { state: 'code_expired' };
+  if (value === 'InvalidPasswordException') return { state: 'password_rejected' };
+  if (value === 'LimitExceededException' || value === 'TooManyRequestsException' || value === 'TooManyFailedAttemptsException') return { state: 'rate_limited' };
+  return { state: 'error' };
 }
 
 export async function beginHostedLogin(returnPath = `${window.location.pathname}${window.location.search}`): Promise<void> {

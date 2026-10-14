@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-billing ai-loop" role="img" aria-label="Billing (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiPrint{0%,26%,100%{transform:none;opacity:1}4%{transform:translateY(-3px) scaleY(.6);opacity:0}16%{transform:translateY(.3px);opacity:1}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-rc{animation:aiPrint 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:12px 2px}
+}
+</style>
+<path class="f p-rc" fill-rule="evenodd" d="M4 4Q4 2.6 5.4 2.6L15 2.6Q16.4 2.6 17.39 3.59L19.01 5.21Q20 6.2 20 7.6L20 20Q20 21.4 18.78 20.71L18.55 20.59Q17.33 19.9 16.11 20.59L15.89 20.71Q14.67 21.4 13.45 20.71L13.22 20.59Q12 19.9 10.78 20.59L10.55 20.71Q9.33 21.4 8.11 20.71L7.89 20.59Q6.67 19.9 5.45 20.59L5.22 20.71Q4 21.4 4 20ZM7.2 8.1Q7.2 7.4 7.9 7.4L14.1 7.4Q14.8 7.4 14.8 8.1L14.8 8.6Q14.8 9.3 14.1 9.3L7.9 9.3Q7.2 9.3 7.2 8.6ZM7.2 11.9Q7.2 11.2 7.9 11.2L16.1 11.2Q16.8 11.2 16.8 11.9L16.8 12.4Q16.8 13.1 16.1 13.1L7.9 13.1Q7.2 13.1 7.2 12.4ZM7.2 15.7Q7.2 15 7.9 15L11.5 15Q12.2 15 12.2 15.7L12.2 16.2Q12.2 16.9 11.5 16.9L7.9 16.9Q7.2 16.9 7.2 16.2Z"/>
+</svg>

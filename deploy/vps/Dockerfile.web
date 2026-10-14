@@ -5,21 +5,35 @@ ENV CI=true
 RUN corepack enable
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY apps/web/package.json apps/web/package.json
-COPY packages/authorization/package.json packages/authorization/package.json
-COPY packages/automation/package.json packages/automation/package.json
-COPY packages/career-readiness/package.json packages/career-readiness/package.json
-COPY packages/events/package.json packages/events/package.json
-COPY packages/identity/package.json packages/identity/package.json
-COPY packages/persistence/package.json packages/persistence/package.json
-COPY apps/api/package.json apps/api/package.json
+# Every workspace member, not a hand-kept list: a missing member breaks the
+# frozen install. apps/android is excluded by .dockerignore.
+COPY apps apps
+COPY packages packages
 
 RUN pnpm install --frozen-lockfile
 
-COPY apps/web apps/web
 COPY tsconfig.base.json ./
 
+# Browser configuration is fixed at build time; docker-compose.yml passes it from the
+# server's .env. The Cognito values are public identifiers, not secrets. Redirect and
+# logout URIs are left blank on purpose: the app then uses its own origin.
+ARG VITE_API_BASE_URL=https://oneby8.com
+ARG VITE_COGNITO_DOMAIN=
+ARG VITE_COGNITO_CLIENT_ID=
+ARG VITE_COGNITO_USER_POOL_ID=
+ARG VITE_COGNITO_REDIRECT_URI=
+ARG VITE_COGNITO_LOGOUT_URI=
+# "true" builds the sandbox for demo.oneby8.com: the same real application with the
+# "Demo - sample data" marker on every screen (docker-compose.yml service web-sandbox,
+# ADR-046). Left blank for oneby8.com.
+ARG VITE_SANDBOX=
+
 RUN pnpm --filter @planthepath/web build
+
+# Fails the image build if the boundary between the two sites is crossed: neither may
+# ship pilot sample data, the production bundle must carry no sandbox marker, and the
+# sandbox bundle must carry it (apps/web/scripts/check-demo-boundary.mjs).
+RUN if [ "$VITE_SANDBOX" = "true" ]; then variant=sandbox; else variant=production; fi;     node apps/web/scripts/check-demo-boundary.mjs apps/web/dist "$variant"
 
 FROM caddy:2.8-alpine AS runtime
 COPY deploy/vps/web.Caddyfile /etc/caddy/Caddyfile

@@ -5,10 +5,27 @@
 # turns a would-be outage at switch time into a named list of missing lines before
 # any build starts. It checks and reports; it never writes app.env, because that
 # file is the operator's.
+#
+# Staff pool (ADR-025, OPS-07). Usage:
+#   preflight-production.sh [APP_ENV] [--require-staff-pool]
+# A half-configured staff pool always fails, because the API refuses to start with one.
+# A missing staff pool is a named warning by default -- production runs without one
+# until Divakar creates it (docs/ops/runbook-staff-pool.md) -- and a failure with
+# --require-staff-pool, which is how the security go-live release is checked.
+# Only setting names are ever printed, never their values.
 set -euo pipefail
 
-APP_ENV=${1:-/srv/planthepath-next/shared/app.env}
+APP_ENV=/srv/planthepath-next/shared/app.env
+REQUIRE_STAFF_POOL=0
+for arg in "$@"; do
+  case "${arg}" in
+    --require-staff-pool) REQUIRE_STAFF_POOL=1 ;;
+    -*) echo "unknown option: ${arg}" >&2; exit 64 ;;
+    *) APP_ENV=${arg} ;;
+  esac
+done
 MISSING=()
+WARNINGS=()
 
 need() { # key, description
   local key=$1 description=$2 value
@@ -40,6 +57,39 @@ FILE_KEY_VALUE=$(grep -s '^FILE_ENCRYPTION_KEY=' "${APP_ENV}" | tail -n 1 | cut 
 if [ -n "${STORAGE_ROOT_VALUE}" ] && [ -z "${FILE_KEY_VALUE}" ]; then
   MISSING+=("FILE_ENCRYPTION_KEY|required when FILE_STORAGE_ROOT is set; generate with: openssl rand -base64 32")
 fi
+
+# ADR-025 staff pool. Mirrors parseStaffPool in apps/api/src/config.ts.
+value_of() { grep -s "^$1=" "${APP_ENV}" | tail -n 1 | cut -d= -f2- || true; }
+POOL_ID_PATTERN='^[a-z]{2}(-[a-z]+)+-[0-9]+_[A-Za-z0-9]+$'
+STAFF_POOL_VALUE=$(value_of COGNITO_STAFF_USER_POOL_ID)
+STAFF_CLIENT_VALUE=$(value_of COGNITO_STAFF_CLIENT_ID)
+if [ -z "${STAFF_POOL_VALUE}" ] && [ -z "${STAFF_CLIENT_VALUE}" ]; then
+  if [ "${REQUIRE_STAFF_POOL}" -eq 1 ]; then
+    MISSING+=("COGNITO_STAFF_USER_POOL_ID|staff pool id with MFA REQUIRED (ADR-025); see docs/ops/runbook-staff-pool.md")
+    MISSING+=("COGNITO_STAFF_CLIENT_ID|the staff pool's app client id; see docs/ops/runbook-staff-pool.md")
+  else
+    WARNINGS+=("COGNITO_STAFF_USER_POOL_ID|not set: internal roles still sign in without MFA (ADR-025); required for security go-live")
+    WARNINGS+=("COGNITO_STAFF_CLIENT_ID|not set: see docs/ops/runbook-staff-pool.md")
+  fi
+elif [ -z "${STAFF_POOL_VALUE}" ] || [ -z "${STAFF_CLIENT_VALUE}" ]; then
+  [ -z "${STAFF_POOL_VALUE}" ] && MISSING+=("COGNITO_STAFF_USER_POOL_ID|must be set together with COGNITO_STAFF_CLIENT_ID")
+  [ -z "${STAFF_CLIENT_VALUE}" ] && MISSING+=("COGNITO_STAFF_CLIENT_ID|must be set together with COGNITO_STAFF_USER_POOL_ID")
+else
+  if ! printf '%s' "${STAFF_POOL_VALUE}" | grep -Eq "${POOL_ID_PATTERN}"; then
+    MISSING+=("COGNITO_STAFF_USER_POOL_ID|not a Cognito user pool id (region_suffix)")
+  fi
+  if [ "${STAFF_POOL_VALUE}" = "$(value_of COGNITO_USER_POOL_ID)" ]; then
+    MISSING+=("COGNITO_STAFF_USER_POOL_ID|names the student pool; it must be the separate staff pool")
+  fi
+  if [ "${STAFF_CLIENT_VALUE}" = "$(value_of COGNITO_CLIENT_ID)" ]; then
+    MISSING+=("COGNITO_STAFF_CLIENT_ID|equals COGNITO_CLIENT_ID; it must be the staff pool's own client")
+  fi
+fi
+
+for entry in "${WARNINGS[@]+"${WARNINGS[@]}"}"; do
+  printf 'warning: %-28s %s
+' "${entry%%|*}" "${entry#*|}" >&2
+done
 
 if [ ${#MISSING[@]} -gt 0 ]; then
   echo "app.env is not ready for production mode. Add or fix these lines in ${APP_ENV}:" >&2

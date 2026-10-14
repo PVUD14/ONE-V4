@@ -30,6 +30,54 @@ function institutionSecurityContext(): { readonly userId: string; readonly membe
   return { userId: 'admin-user', memberships: [{ organizationId: 'institution-1', role: 'INSTITUTION_ADMIN', scope: { organizationId: 'institution-1', institutionId: 'institution-1' } }] };
 }
 
+const recruiterEmployerId = 'employer-1';
+const recruiterOpportunityId = 'opportunity-1';
+const recruiterOpportunity = {
+  id: recruiterOpportunityId,
+  referenceCode: 'SOC-2026-01',
+  lifecycleState: 'PUBLISHED',
+  title: 'SOC Analyst Intern',
+  employmentType: 'INTERNSHIP',
+  workMode: 'ONSITE',
+  locationCity: 'Bengaluru',
+  applicationDeadline: null,
+  publishedAt: '2026-08-01T00:00:00.000Z',
+  applicationCount: 3,
+  openApplicationCount: 3,
+};
+const recruiterApplicants = [
+  { id: 'route-interview', state: 'INTERVIEW', consentRevoked: false, candidateName: 'Aanya Interview', candidateEmail: 'aanya@uat.example.test',
+    institutionStudentId: null, submittedAt: '2026-08-10T00:00:00.000Z', closedAt: null, interviewCount: 1, offerState: null, updatedAt: '2026-08-10T00:00:00.000Z' },
+  { id: 'route-offer', state: 'OFFER', consentRevoked: false, candidateName: 'Ojas Offer', candidateEmail: 'ojas@uat.example.test',
+    institutionStudentId: null, submittedAt: '2026-08-11T00:00:00.000Z', closedAt: null, interviewCount: 1, offerState: 'EXTENDED', updatedAt: '2026-08-11T00:00:00.000Z' },
+  { id: 'route-applied', state: 'APPLIED', consentRevoked: false, candidateName: 'Mira Applied', candidateEmail: 'mira@uat.example.test',
+    institutionStudentId: null, submittedAt: '2026-08-12T00:00:00.000Z', closedAt: null, interviewCount: 0, offerState: null, updatedAt: '2026-08-12T00:00:00.000Z' },
+];
+
+function recruiterSecurityContext(): { readonly userId: string; readonly memberships: readonly { readonly organizationId: string; readonly role: string; readonly scope: { readonly organizationId: string; readonly employerId: string } }[] } {
+  return { userId: 'recruiter-user', memberships: [{ organizationId: recruiterEmployerId, role: 'RECRUITER', scope: { organizationId: recruiterEmployerId, employerId: recruiterEmployerId } }] };
+}
+
+function configureRecruiterFetch(): void {
+  fetchMock.mockImplementation(async (url: string) => {
+    if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'recruiter-token', id_token: jwtWithEmail('recruiter@example.test') }) };
+    if (url.endsWith('/health')) return { ok: true };
+    if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
+    if (url.endsWith('/api/v1/security/context')) return { ok: true, json: async () => recruiterSecurityContext() };
+    if (url.endsWith(`/api/v1/employers/${recruiterEmployerId}/opportunities`)) return { ok: true, json: async () => ({ opportunities: [recruiterOpportunity] }) };
+    if (url.endsWith(`/api/v1/employers/${recruiterEmployerId}/opportunities/${recruiterOpportunityId}/applications`)) return { ok: true, json: async () => ({ applications: recruiterApplicants }) };
+    return { ok: true, json: async () => ({}) };
+  });
+}
+
+async function signInRecruiter(): Promise<void> {
+  configureHostedCallback('recruiter@example.test');
+  configureRecruiterFetch();
+  render(<App />);
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument());
+  cleanup();
+}
+
 beforeEach(() => {
   window.history.pushState(null, '', '/demo/student');
   fetchMock.mockReset();
@@ -45,16 +93,32 @@ describe('All-role portal registry and preview workflows', () => {
       cleanup();
       window.history.pushState(null, '', path);
       render(<App />);
-      expect(screen.getByText('ONE PLATFORM')).toBeInTheDocument();
-      expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
-      expect(screen.getByText('LEARN | PREPARE | BUILD | GROW')).toBeInTheDocument();
+      expect(screen.getByText('Welcome back')).toBeInTheDocument();
+      expect(screen.getByRole('img', { name: 'ONE by AI8HT' })).toHaveAttribute('src', '/brand/one-lockup-full-color-on-dark.svg');
+      expect(document.title).toBe('Sign in | ONE by AI8HT');
+      expect(screen.getByRole('heading', { name: 'Sign in to ONE' })).toBeInTheDocument();
+      expect(screen.getByRole('list', { name: 'Learn, prepare, build, grow' })).toHaveTextContent('LEARNPREPAREBUILDGROW');
       expect(screen.getByLabelText('Email')).toHaveAttribute('autocomplete', 'username');
       expect(screen.getByLabelText('Password')).toHaveAttribute('autocomplete', 'current-password');
       expect(screen.getByRole('button', { name: 'Sign in' })).toBeDisabled();
-      expect(screen.getByText(/Secure sign-in is not available in this UAT environment yet/i)).toBeInTheDocument();
+      expect(screen.getByText(/Sign-in is not available right now/i)).toBeInTheDocument();
+      expect(screen.queryByText(/\bUAT\b|Cognito/)).not.toBeInTheDocument();
       expect(screen.queryByText(/Cognito UAT login is not configured/i)).not.toBeInTheDocument();
       expect(screen.queryByText('Rahul Kumar')).not.toBeInTheDocument();
     }
+  });
+
+  it('opens the public employer access request from sign-in, without a session (EMP-04)', () => {
+    fetchMock.mockResolvedValue({ ok: true });
+    window.history.pushState(null, '', '/login');
+    render(<App />);
+    fireEvent.click(screen.getByRole('link', { name: 'Request employer access' }));
+    expect(window.location.pathname).toBe('/employer-access');
+    expect(screen.getByRole('heading', { name: 'Request employer access' })).toBeInTheDocument();
+    const logo = screen.getByRole('img', { name: 'ONE by AI8HT' });
+    expect(logo).toHaveAttribute('src', '/brand/one-lockup-full-color-on-dark.svg');
+    expect(screen.getByLabelText('Work email')).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/employer-access-requests'))).toBe(false);
   });
 
   it('does not persist login password input while Cognito is unavailable', () => {
@@ -74,7 +138,7 @@ describe('All-role portal registry and preview workflows', () => {
       window.history.pushState(null, '', path);
       render(<App />);
       expect(screen.getByRole('heading', { name: 'Sign in required' })).toBeInTheDocument();
-      expect(screen.getByText(/does not use role selection, fixture data, or browser-stored demo identities/i)).toBeInTheDocument();
+      expect(screen.getByText(/portal is only for people with an account/i)).toBeInTheDocument();
       expect(screen.queryByText('Rahul Kumar')).not.toBeInTheDocument();
     }
   });
@@ -121,7 +185,7 @@ describe('All-role portal registry and preview workflows', () => {
       expect(screen.getByLabelText(`${portal.roleName} navigation`)).toBeInTheDocument();
       expect(screen.getByText(portal.previewUser)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: portal.nav[0]!.label })).toHaveAttribute('aria-current', 'page');
-      expect(document.title).toBe(`${portal.dashboardTitle} | ONE`);
+      expect(document.title).toBe(`${portal.dashboardTitle} | ONE by AI8HT`);
     }
   });
 
@@ -174,8 +238,8 @@ describe('All-role portal registry and preview workflows', () => {
     window.history.pushState(null, '', '/operations/admin/organizations');
     render(<App />);
     expect(screen.getByRole('heading', { name: 'Sign in required' })).toBeInTheDocument();
-    expect(screen.getByText(/operations portal is protected/i)).toBeInTheDocument();
-    expect(screen.getByText(/Cognito is not configured, so this route fails closed/i)).toBeInTheDocument();
+    expect(screen.getByText(/operations portal is only for people with an account/i)).toBeInTheDocument();
+    expect(screen.getByText(/Sign-in is not available right now, so this page stays closed/i)).toBeInTheDocument();
     expect(screen.queryByText('ABC Engineering College')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Update preview queue status/i })).not.toBeInTheDocument();
   });
@@ -192,13 +256,63 @@ describe('All-role portal registry and preview workflows', () => {
     expect(screen.queryByText(/Student Readiness/i)).not.toBeInTheDocument();
   });
 
+  it('routes recruiter Interviews and Offers to filtered Applicants while Talent Pool says it is not available yet', async () => {
+    const recruiter = activeRolePortals.find((item) => item.key === 'recruiter')!;
+    expect(recruiter.nav.filter((item) => item.group === 'Hiring').map((item) => [item.label, item.path])).toEqual([
+      ['Opportunities', '/employer/recruiter/opportunities'],
+      ['Opportunity Detail', '/employer/recruiter/opportunity-detail'],
+      ['Applicants', '/employer/recruiter/applicants'],
+      ['Candidate Detail', '/employer/recruiter/candidate-detail'],
+      ['Assessments', '/employer/recruiter/assessments'],
+      ['Interviews', '/employer/recruiter/interviews'],
+      ['Talent Pool', '/employer/recruiter/talent-pool'],
+      ['Offers', '/employer/recruiter/offers'],
+    ]);
+
+    await signInRecruiter();
+
+    cleanup();
+    window.history.pushState(null, '', '/employer/recruiter/interviews');
+    render(<App />);
+    expect(await screen.findByText('Aanya Interview')).toBeInTheDocument();
+    expect(screen.getByText((_content, element) => element?.textContent === 'Application state filter: Interview')).toBeInTheDocument();
+    expect(screen.queryByText('Ojas Offer')).not.toBeInTheDocument();
+    expect(screen.queryByText('Mira Applied')).not.toBeInTheDocument();
+    expect(screen.queryByText('Not built yet')).not.toBeInTheDocument();
+    expect(within(screen.getByLabelText('Recruiter navigation')).getByRole('button', { name: 'Interviews' })).toHaveAttribute('aria-current', 'page');
+
+    cleanup();
+    window.history.pushState(null, '', '/employer/recruiter/offers');
+    render(<App />);
+    expect(await screen.findByText('Ojas Offer')).toBeInTheDocument();
+    expect(screen.getByText((_content, element) => element?.textContent === 'Application state filter: Offer')).toBeInTheDocument();
+    expect(screen.queryByText('Aanya Interview')).not.toBeInTheDocument();
+    expect(screen.queryByText('Mira Applied')).not.toBeInTheDocument();
+    expect(screen.queryByText('Not built yet')).not.toBeInTheDocument();
+    expect(within(screen.getByLabelText('Recruiter navigation')).getByRole('button', { name: 'Offers' })).toHaveAttribute('aria-current', 'page');
+
+    cleanup();
+    window.history.pushState(null, '', '/employer/recruiter/talent-pool');
+    render(<App />);
+    // EMP-07: Talent Pool no longer borrows the applicants list; it says plainly that consented
+    // discovery (EMP-14) does not exist yet, and shows nobody.
+    expect(await screen.findByRole('heading', { name: 'Not available yet' })).toBeInTheDocument();
+    expect(screen.getByText(/Talent Pool will list students who have chosen to be discoverable/)).toBeInTheDocument();
+    expect(screen.queryByText('Aanya Interview')).not.toBeInTheDocument();
+    expect(screen.queryByText('Ojas Offer')).not.toBeInTheDocument();
+    expect(screen.queryByText('Mira Applied')).not.toBeInTheDocument();
+    expect(screen.queryByText((_content, element) => element?.textContent?.startsWith('Application state filter:') ?? false)).not.toBeInTheDocument();
+    expect(screen.queryByText('Not built yet')).not.toBeInTheDocument();
+    expect(within(screen.getByLabelText('Recruiter navigation')).getByRole('button', { name: 'Talent Pool' })).toHaveAttribute('aria-current', 'page');
+  });
+
   it('renders invitation acceptance as a protected verified-recipient workflow without accepting from preview state', () => {
     fetchMock.mockResolvedValue({ ok: true });
     window.history.pushState(null, '', '/invitations/accept?token=raw-invite-token');
     render(<App />);
     expect(screen.getByRole('heading', { name: 'Accept organization invitation' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Sign in required' })).toBeInTheDocument();
-    expect(screen.getByText(/raw invitation token is read only from this link and is not stored/i)).toBeInTheDocument();
+    expect(screen.getByText(/invitation link is used only on this page and is not saved in your browser/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeDisabled();
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/health'), expect.anything());
     expect(fetchMock).not.toHaveBeenCalledWith(expect.stringContaining('/api/v1/invitations/accept'), expect.anything());
@@ -215,6 +329,7 @@ describe('All-role portal registry and preview workflows', () => {
     fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
       if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'institution-token', id_token: jwtWithEmail('institution.admin@example.test') }) };
       if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
       if (url.endsWith('/api/v1/security/context')) {
         contextCalls += 1;
         expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer institution-token');
@@ -246,11 +361,37 @@ describe('All-role portal registry and preview workflows', () => {
     expect(screen.queryByText('OPERATIONS_ADMIN')).not.toBeInTheDocument();
   });
 
+  it('keeps a graduated student in their own workspace and tells them where they stand (INST-10)', async () => {
+    configureHostedCallback('graduate@example.test');
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'graduate-token', id_token: jwtWithEmail('graduate@example.test') }) };
+      if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
+      if (url.endsWith('/api/v1/security/context')) {
+        return { ok: true, json: async () => ({ userId: 'graduate-user', memberships: [], studentRelationships: [],
+          formerStudentRelationships: [{ institutionId: 'institution-1', state: 'GRADUATED', effectiveFrom: '2022-07-01T00:00:00.000Z', effectiveTo: '2026-05-31T06:30:00.000Z' }] }) };
+      }
+      if (url.endsWith('/api/v1/students/me')) {
+        return { ok: true, json: async () => ({ student: { userId: 'graduate-user', verifiedEmail: 'graduate@example.test', fullName: 'Asha Rao', institutionStudentId: 'CSE-001',
+          institutionId: 'institution-1', institutionName: 'Local College', formerStudent: true, academicStatus: 'GRADUATED',
+          relationship: { id: 'rel-1', state: 'GRADUATED', effectiveFrom: '2022-07-01T00:00:00.000Z', effectiveTo: '2026-05-31T06:30:00.000Z' } } }) };
+      }
+      return { ok: false, status: 404, headers: { get: () => null }, json: async () => ({}) };
+    });
+    render(<App />);
+    await waitFor(() => expect(window.location.pathname).toBe('/student'));
+    expect(await screen.findByText('Graduated from Local College on 31 May 2026')).toBeInTheDocument();
+    expect(screen.getByText(/Your ONE account, your records and your choices stay yours/)).toBeInTheDocument();
+    expect(screen.queryByText(/No active ONE workspace/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Student identity unavailable/)).not.toBeInTheDocument();
+  }, 20000);
+
   it('ignores an aborted workspace context request instead of showing a false workspace failure', async () => {
     configureHostedCallback();
     fetchMock.mockImplementation(async (url: string) => {
       if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'institution-token', id_token: jwtWithEmail('institution.admin@uat.example.test') }) };
       if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
       if (url.endsWith('/api/v1/security/context')) throw new DOMException('Request was aborted by effect cleanup.', 'AbortError');
       return { ok: false };
     });
@@ -267,11 +408,12 @@ describe('All-role portal registry and preview workflows', () => {
     fetchMock.mockImplementation(async (url: string) => {
       if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'institution-token', id_token: jwtWithEmail('institution.admin@uat.example.test') }) };
       if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
       if (url.endsWith('/api/v1/security/context')) return { ok: false, status: 500, headers: { get: () => 'ctx-500' }, json: async () => ({ message: { correlationId: 'ctx-500' } }) };
       return { ok: false };
     });
     render(<App />);
-    expect(await screen.findByRole('alert')).toHaveTextContent('We could not load your ONE workspace. Reference: ctx-500');
+    expect(await screen.findByRole('alert')).toHaveTextContent('We could not load your ONE workspace. Support code: ctx500');
     expect(screen.getByRole('button', { name: 'Retry workspace' })).toBeInTheDocument();
   });
 
@@ -281,6 +423,7 @@ describe('All-role portal registry and preview workflows', () => {
     fetchMock.mockImplementation(async (url: string) => {
       if (url === 'https://uat-auth.example.test/oauth2/token') return { ok: true, json: async () => ({ access_token: 'institution-token', id_token: jwtWithEmail('institution.admin@uat.example.test') }) };
       if (url.endsWith('/health')) return { ok: true };
+      if (url.endsWith('/api/v1/me/consents/privacy-notice')) return { ok: true, json: async () => ({ requiredVersion: null, grantedVersion: null, required: false }) };
       if (url.endsWith('/api/v1/security/context')) {
         contextCalls += 1;
         if (contextCalls === 1) throw new TypeError('temporary network failure');
@@ -291,7 +434,9 @@ describe('All-role portal registry and preview workflows', () => {
     render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: 'Retry workspace' }));
     await waitFor(() => expect(window.location.pathname).toBe('/institution/admin'));
-    await waitFor(() => expect(screen.getByText('Placement Dashboard')).toBeInTheDocument());
+    // The administrator lands on their own home, not the placement officer's dashboard.
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Institution Administration', level: 1 })).toBeInTheDocument());
+    expect(screen.queryByText('Placement Dashboard')).not.toBeInTheDocument();
     expect(screen.queryByText(/Rahul Kumar/)).not.toBeInTheDocument();
   });
 
@@ -367,6 +512,17 @@ describe('Student portal completion', () => {
     expect(screen.getByRole('dialog', { name: 'Messages' })).toHaveTextContent(/No messages yet/);
     fireEvent.click(screen.getByRole('button', { name: 'Notifications' }));
     expect(screen.getByRole('dialog', { name: 'Notifications' })).toHaveTextContent(/caught up/);
+  });
+
+  it('adds Ask ONE to explain at the end of Prepare without moving any other item (ADR-052)', () => {
+    fetchMock.mockResolvedValue({ ok: true });
+    render(<App />);
+    const nav = screen.getByRole('complementary', { name: 'Student navigation' });
+    const labels = within(nav).getAllByRole('button').map((button) => button.textContent?.trim() ?? '');
+    const at = (label: string) => labels.findIndex((text) => text.includes(label));
+    expect(at('Ask ONE to explain')).toBeGreaterThan(at('Experience'));
+    expect(at('Ask ONE to explain')).toBeLessThan(at('Opportunities'));
+    expect(at('Experience')).toBeGreaterThan(at('Company Prep'));
   });
 
   it('keeps Experience in grouped navigation and supports drawer keyboard behavior', () => {
@@ -551,7 +707,7 @@ describe('Student portal completion', () => {
     fetchMock.mockResolvedValue({ ok: true });
     window.history.pushState(null, '', '/demo/student/learning');
     render(<App />);
-    await waitFor(() => expect(document.title).toBe('Learning - Student | ONE'));
+    await waitFor(() => expect(document.title).toBe('Learning - Student | ONE by AI8HT'));
   });
   it('edits Student-owned target career with validation and session-local feedback', () => {
     fetchMock.mockResolvedValue({ ok: true });
@@ -772,13 +928,13 @@ describe('Institution placement officer portal foundation', () => {
     expect(screen.getByLabelText('Placement Officer identity')).toHaveTextContent('Anita Sharma');
     await waitFor(() => expect(screen.getByText('API Online')).toBeInTheDocument());
     expect(screen.queryByText(/127\.0\.0\.1:3000/i)).not.toBeInTheDocument();
-    expect(document.title).toBe('Placement Dashboard | ONE');
+    expect(document.title).toBe('Placement Dashboard | ONE by AI8HT');
   });
 
   it.each([
-    ['/demo/institution/placement-officer/students', 'Students - Placement Officer | ONE'],
-    ['/demo/institution/placement-officer/assessments', 'Assessments - Placement Officer | ONE'],
-    ['/demo/institution/placement-officer/reports', 'Reports - Placement Officer | ONE'],
+    ['/demo/institution/placement-officer/students', 'Students - Placement Officer | ONE by AI8HT'],
+    ['/demo/institution/placement-officer/assessments', 'Assessments - Placement Officer | ONE by AI8HT'],
+    ['/demo/institution/placement-officer/reports', 'Reports - Placement Officer | ONE by AI8HT'],
   ])('sets staff document title for %s', (path, title) => {
     window.history.pushState(null, '', path);
     render(<App />);

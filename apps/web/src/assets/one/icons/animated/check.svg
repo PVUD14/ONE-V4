@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-check ai-loop" role="img" aria-label="Check (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiWipe{0%,2%{transform:scaleX(0)}16%,100%{transform:none}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-ck{animation:aiWipe 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:3.6px 12px}
+}
+</style>
+<path class="f p-ck" fill-rule="evenodd" d="M4.24 13.24Q3.6 12.6 4.24 11.96L5.76 10.44Q6.4 9.8 7.04 10.44L9.16 12.56Q9.8 13.2 10.44 12.56L16.96 6.04Q17.6 5.4 18.24 6.04L19.76 7.56Q20.4 8.2 19.76 8.84L10.44 18.16Q9.8 18.8 9.16 18.16Z"/>
+</svg>

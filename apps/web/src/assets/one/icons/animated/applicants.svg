@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-applicants ai-loop" role="img" aria-label="Applicants (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiSlideIn{0%,26%,100%{transform:none;opacity:1}5%{transform:translate(-2.4px,2.4px);opacity:0}16%{transform:translate(.4px,-.4px);opacity:1}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-back{animation:aiSlideIn 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:12px 12px}
+}
+</style>
+<g class="s"><path class="f p-back" fill-rule="evenodd" d="M6.2 4.1Q6.2 3 7.3 3L17.1 3Q18.2 3 18.98 3.78L20.82 5.62Q21.6 6.4 21.6 7.5L21.6 16.3Q21.6 17.4 20.5 17.4L19.5 17.4Q18.4 17.4 18.4 16.3L18.4 7.7Q18.4 6.6 17.3 6.6L7.3 6.6Q6.2 6.6 6.2 5.5Z"/></g><path class="f " fill-rule="evenodd" d="M2.4 9.8Q2.4 8.2 4 8.2L12.2 8.2Q13.8 8.2 14.93 9.33L15.67 10.07Q16.8 11.2 16.8 12.8L16.8 20Q16.8 21.6 15.2 21.6L4 21.6Q2.4 21.6 2.4 20ZM7.3 13.2a2.3 2.3 0 1 0 4.6 0a2.3 2.3 0 1 0 -4.6 0ZM6.7 19.4Q5.8 19.4 6.1 18.55L6.5 17.45Q6.8 16.6 7.7 16.6L11.5 16.6Q12.4 16.6 12.7 17.45L13.1 18.55Q13.4 19.4 12.5 19.4Z"/>
+</svg>

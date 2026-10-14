@@ -20,7 +20,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
     personas: ['all'],
     title: 'Signing in and choosing a workspace',
     keywords: ['login', 'sign in', 'password', 'workspace', 'account', 'locked'],
-    body: 'Sign in at one.ai8ht.pro with the email and password issued to you. After signing in you land in the workspace that matches your role: students in the student portal, institution staff in the institution portal, employers in the employer portal. If your password does not work or your account is locked, contact your placement cell (students) or the ONE operator who issued your account — the assistant cannot reset passwords.',
+    body: 'Sign in at oneby8.com with the email and password issued to you. After signing in you land in the workspace that matches your role: students in the student portal, institution staff in the institution portal, employers in the employer portal. If your password does not work or your account is locked, contact your placement cell (students) or the ONE operator who issued your account — the assistant cannot reset passwords.',
   },
   {
     id: 'navigation',
@@ -34,7 +34,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
     personas: ['all'],
     title: 'Notifications',
     keywords: ['notification', 'bell', 'alert', 'badge', 'unread'],
-    body: 'For students, notifications are derived from real account state: assessments assigned and still open, attempts in progress, and freshly published results. For institution staff, the bell summarises published assessments, completed attempts and questions awaiting review. There is no separate notification settings page yet.',
+    body: 'For students, notifications are derived from real account state: assessments assigned and still open, attempts in progress, and freshly published results. For institution staff, the bell summarises published assessments, completed attempts and questions awaiting review. Institution faculty and department heads can set email reminders and quiet hours under Settings; ONE does not send staff reminder emails yet.',
   },
   {
     id: 'privacy-data',
@@ -86,6 +86,13 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
     body: 'If an assessment shows Opens soon, its window has not started yet. Window closed means the start window has passed. Completed with no attempts left means you used your allowance. In all three cases only your institution can help: staff can reopen the window, add attempts, or change the per-attempt duration. Ask your placement cell — the assistant cannot change assessment windows. Also note assessments are laptop-only: on a phone you will see the assignment but the start button is replaced with a laptop-only notice.',
   },
   {
+    id: 'employer-screening-tests',
+    personas: ['student'],
+    title: 'Screening tests from employers',
+    keywords: ['screening', 'employer', 'screening test', 'invited', 'recruiter test', 'phone'],
+    body: 'An employer can send you a screening test once your application reaches its Assessment stage; you are told in your notifications, and it appears under Assessments (and Screening tests in the app, where you can take it). Before you start you see what it covers: how many questions, their formats, the marks, and the minutes you will have. It is one sitting; the timer runs on ONE’s server from the moment you begin and does not pause, and if the test’s window closes first you get less time. No camera, microphone or screen capture is used. Your result goes only to that employer, for that application, while you share it with them; it is not part of your academic record or learning evidence and never changes your readiness.',
+  },
+  {
     id: 'learning-lessons',
     personas: ['student'],
     title: 'Learning and lesson completion',
@@ -125,14 +132,14 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
     personas: ['institution'],
     title: 'Roster, drives and interventions',
     keywords: ['roster', 'batch', 'department', 'drive', 'intervention', 'analytics', 'placement'],
-    body: 'The institution portal carries your student roster by department and batch, placement drives, skill interventions and analytics. Assessments are assigned against active roster students. Readiness analytics are aggregate and advisory — they inform your placement work and are never exposed to employers at student level.',
+    body: 'The institution portal carries your student roster by department and batch, campus drives, skill interventions and analytics. Employers ask to run a role as a campus drive; it reaches your students only after your placement office approves it (the placement officer decides on the Dashboard, an administrator under Placement), and your one-offer-per-student policy, set under Settings or on the placement officer Dashboard, applies to applications through your drives. Placement statistics by department and batch, and the placement register of employers engaged and the drive calendar, are on Placement (and the placement officer Dashboard); they count only applications students chose to share with the college, stand at the end of the last full month, show any group under five as <5, and never count a student who shared nothing as unplaced. Your own drive categories, such as Dream, Core or Mass, are set under Settings and are never shown to employers or students. Assessments are assigned against active roster students. Readiness analytics are aggregate and advisory — they inform your placement work and are never exposed to employers at student level.',
   },
   {
     id: 'employer-roles-drives',
     personas: ['employer'],
     title: 'Roles and campus drives',
     keywords: ['role', 'post', 'job', 'drive', 'campus', 'pipeline', 'applications', 'shortlist', 'offer'],
-    body: 'Post roles from the employer portal and run structured campus drives with partner institutions. Applications, shortlists and offers are tracked per role so the pipeline stays in one view.',
+    body: 'Post roles from the employer portal. To run a campus drive, open the role under Opportunity Detail and ask a college for one: the role reaches the students of that college only after its placement office approves, and the placement rules of the college apply to applications through the drive. Applications, shortlists and offers are tracked per role so the pipeline stays in one view. The Dashboard counts your open roles, new applicants in the last 7 days, the interviews this week, offers awaiting an answer and drives awaiting a college. Reports break applications down by role, college and drive, with time to each stage and offer acceptance; any group of fewer than 5 people reads <5, so no candidate is singled out.',
   },
   {
     id: 'employer-candidates',
@@ -142,11 +149,18 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
     body: 'You meet candidates through profiles they have consented to share — current skills, projects and certifications, opened from a link or a QR code the student presents. ONE does not expose internal readiness scores to employers by design: candidates are evaluated on real evidence, and your own assessments, not on an opaque platform ranking.',
   },
   {
+    id: 'employer-screening-assessments',
+    personas: ['employer'],
+    title: 'Screening tests for applicants',
+    keywords: ['assessment', 'screening', 'test', 'question bank', 'invite', 'window', 'results'],
+    body: 'Under Assessments you write questions into your own bank (someone other than the author approves each one), build a test from approved questions, publish it and send it to applicants who are in the Assessment stage, with a window of up to 30 days. Each candidate gets the test’s full length unless the window closes first, and ONE’s server keeps the time. Results are listed in the order candidates were sent the test, never ranked by score, and each candidate’s answers question by question appear in Candidate Detail — only while they share their application with you. Rejecting or archiving a question and closing a test ask for a reason. Your bank is yours alone: you cannot see a college’s question bank, and it cannot see yours.',
+  },
+  {
     id: 'mobile-app',
     personas: ['all'],
     title: 'The ONE mobile app',
     keywords: ['app', 'mobile', 'android', 'phone', 'theme', 'install', 'sign in'],
-    body: 'The Android app signs in with the same email and password as the web. Students see their dashboard, assessments and results, learning, jobs and notifications; institution and employer staff see live monitoring dashboards; operations accounts see a view-only overview. Exams are never taken in the app - a laptop is required. Pick your look from six themes via the palette icon at the top of any screen. Demo accounts work only in the web pilot, not the app.',
+    body: 'The Android app signs in with the same email and password as the web. Students see their dashboard, assessments and results, learning, jobs and notifications; institution and employer staff see live monitoring dashboards; operations accounts see a view-only overview. College exams are never taken in the app - a laptop is required; screening tests an employer sends can be taken on the phone. Pick your look from six themes via the palette icon at the top of any screen. Demo accounts work only in the web pilot, not the app.',
   },
   {
     id: 'help-faq',

@@ -1,39 +1,23 @@
-import {
-  BarChart3,
-  BookOpen,
-  BriefcaseBusiness,
-  FileText,
-  FolderKanban,
-  Gauge,
-  GraduationCap,
-  LayoutDashboard,
-  Lock,
-  Map,
-  Settings,
-  ShieldCheck,
-  Sparkles,
-  UserRound,
-  type LucideIcon,
-} from 'lucide-react';
+import { type IconName } from './icons/Icon.js';
 
 export interface NavItem {
   readonly label: string;
   readonly path: string;
-  readonly icon: LucideIcon;
+  readonly icon: IconName;
 }
 
 export const studentNav: readonly NavItem[] = [
-  { label: 'Dashboard', path: '/student', icon: LayoutDashboard },
-  { label: 'Career Path', path: '/student/career-path', icon: Map },
-  { label: 'Skills', path: '/student/skills', icon: BarChart3 },
-  { label: 'Learning', path: '/student/learning', icon: BookOpen },
-  { label: 'Experience', path: '/student/experience', icon: FolderKanban },
-  { label: 'Opportunities', path: '/student/opportunities', icon: BriefcaseBusiness },
-  { label: 'Applications', path: '/student/applications', icon: GraduationCap },
-  { label: 'Readiness', path: '/student/readiness', icon: Gauge },
-  { label: 'Profile', path: '/student/profile', icon: UserRound },
-  { label: 'Documents', path: '/student/documents', icon: FileText },
-  { label: 'Settings', path: '/student/settings', icon: Settings },
+  { label: 'Dashboard', path: '/student', icon: 'home' },
+  { label: 'Career Path', path: '/student/career-path', icon: 'career' },
+  { label: 'Skills', path: '/student/skills', icon: 'skills' },
+  { label: 'Learning', path: '/student/learning', icon: 'learning' },
+  { label: 'Experience', path: '/student/experience', icon: 'experience' },
+  { label: 'Opportunities', path: '/student/opportunities', icon: 'opportunities' },
+  { label: 'Applications', path: '/student/applications', icon: 'applications' },
+  { label: 'Readiness', path: '/student/readiness', icon: 'readiness' },
+  { label: 'Profile', path: '/student/profile', icon: 'profile' },
+  { label: 'Documents', path: '/student/documents', icon: 'documents' },
+  { label: 'Settings', path: '/student/settings', icon: 'settings' },
 ];
 
 export const previewProfile = {
@@ -120,8 +104,8 @@ export const documents = [
 ];
 
 export const securitySettings = [
-  { label: 'Authentication provider', value: 'Development Cognito pending', icon: Lock },
-  { label: 'Session security', value: 'Protected routes remain API-enforced', icon: ShieldCheck },
-  { label: 'Private AI preview', value: 'Frontend placeholder only', icon: Sparkles },
+  { label: 'Authentication provider', value: 'Development Cognito pending', icon: 'lock' },
+  { label: 'Session security', value: 'Protected routes remain API-enforced', icon: 'trust-safety' },
+  { label: 'Private AI preview', value: 'Frontend placeholder only', icon: 'coach' },
 ];
 

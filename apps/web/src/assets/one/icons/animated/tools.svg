@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-tools ai-loop" role="img" aria-label="Career Tools (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiTile{0%,25%,100%{transform:none}9%{transform:translate(1.6px,-1.8px) rotate(14deg)}18%{transform:translate(0,.3px) rotate(-3deg)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-t4{animation:aiTile 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:17px 7px}
+}
+</style>
+<path class="f " fill-rule="evenodd" d="M3.61 4.37Q3.9 3 5.3 3L10.5 3Q11.9 3 11.61 4.37L10.49 9.63Q10.2 11 8.8 11L3.6 11Q2.2 11 2.49 9.63Z"/><path class="f " fill-rule="evenodd" d="M3.61 14.17Q3.9 12.8 5.3 12.8L10.5 12.8Q11.9 12.8 11.61 14.17L10.49 19.43Q10.2 20.8 8.8 20.8L3.6 20.8Q2.2 20.8 2.49 19.43Z"/><path class="f " fill-rule="evenodd" d="M13.21 14.17Q13.5 12.8 14.9 12.8L20.1 12.8Q21.5 12.8 21.21 14.17L20.09 19.43Q19.8 20.8 18.4 20.8L13.2 20.8Q11.8 20.8 12.09 19.43Z"/><g class="s"><path class="f p-t4" fill-rule="evenodd" d="M13.21 4.37Q13.5 3 14.9 3L20.1 3Q21.5 3 21.21 4.37L20.09 9.63Q19.8 11 18.4 11L13.2 11Q11.8 11 12.09 9.63Z"/></g>
+</svg>

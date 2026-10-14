@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-staff ai-loop" role="img" aria-label="Staff (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiSwingS{0%,30%,100%{transform:none}7%{transform:rotate(-10deg)}15%{transform:rotate(7deg)}22%{transform:rotate(-3deg)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-card{animation:aiSwingS 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:12px 3.6px}
+}
+</style>
+<g class="p-card"><path class="f " fill-rule="evenodd" d="M2.4 8.3Q2.4 6.6 4.1 6.6L16.5 6.6Q18.2 6.6 19.4 7.8L20.4 8.8Q21.6 10 21.6 11.7L21.6 18.9Q21.6 20.6 19.9 20.6L4.1 20.6Q2.4 20.6 2.4 18.9ZM5.8 11.5a2.1 2.1 0 1 0 4.2 0a2.1 2.1 0 1 0 -4.2 0ZM5.5 17.7Q4.6 17.7 4.85 16.83L5.15 15.77Q5.4 14.9 6.3 14.9L9.5 14.9Q10.4 14.9 10.65 15.77L10.95 16.83Q11.2 17.7 10.3 17.7ZM13.2 11.8Q13.2 11.1 13.9 11.1L17.9 11.1Q18.6 11.1 18.6 11.8L18.6 12.3Q18.6 13 17.9 13L13.9 13Q13.2 13 13.2 12.3ZM13.2 15.6Q13.2 14.9 13.9 14.9L16.3 14.9Q17 14.9 17 15.6L17 16.1Q17 16.8 16.3 16.8L13.9 16.8Q13.2 16.8 13.2 16.1Z"/><g class="s"><path class="f " fill-rule="evenodd" d="M9.2 3.6Q9.2 2.6 10.2 2.6L13.8 2.6Q14.8 2.6 14.8 3.6L14.8 4.4Q14.8 5.4 13.8 5.4L10.2 5.4Q9.2 5.4 9.2 4.4Z"/></g></g>
+</svg>

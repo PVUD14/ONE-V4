@@ -224,6 +224,24 @@ describe('assessment engine end to end', () => {
     expect(newAttempt.status).toBe(400);
   });
 
+  it('records exactly one attempt-log row per graded question, with the exam institution (ENG-03)', async () => {
+    const rows = await pool.query<{ item_id: string; correct: boolean; answered: boolean; score: string; institution_id: string; skill_id: string | null; context: string; session_id: string }>(
+      `SELECT item_id, correct, answered, score, institution_id, skill_id, context, session_id
+       FROM learning_attempt_events WHERE source_attempt_type = 'exam_attempt' AND source_attempt_id = $1`, [attemptId],
+    );
+    expect(rows.rows).toHaveLength(3);
+    expect(new Set(rows.rows.map((row) => row.item_id)).size).toBe(3);
+    expect(rows.rows.filter((row) => row.correct)).toHaveLength(2);
+    for (const row of rows.rows) {
+      expect(row).toMatchObject({ answered: true, institution_id: institutionId, skill_id: null, context: 'ASSESSMENT' });
+      expect(Number(row.score)).toBe(row.correct ? 1 : 0);
+    }
+    const sessions = await pool.query<{ id: string; mode: string; institution_id: string }>(
+      "SELECT id, mode, institution_id FROM learning_sessions WHERE source_type = 'exam_attempt' AND source_id = $1", [attemptId],
+    );
+    expect(sessions.rows).toEqual([{ id: rows.rows[0]!.session_id, mode: 'ASSESSMENT', institution_id: institutionId }]);
+  });
+
   it('reports results to institution staff with integrity signals', async () => {
     const results = await api().get(`/api/v1/institutions/${institutionId}/assessments/${examId}/results`).set(auth(staffToken));
     expect(results.status).toBe(200);
@@ -347,6 +365,22 @@ describe('stale attempts and duration changes', () => {
     const autoSubmitted = (results.body.results as { attemptNumber: number; autoSubmitted: boolean }[])
       .find((row) => row.attemptNumber === 2);
     expect(autoSubmitted?.autoSubmitted).toBe(true);
+
+    // Every finalised attempt -- submitted, auto-submitted or expired -- has exactly one
+    // attempt-log row per question on its paper; blanks are recorded as unanswered (ENG-03).
+    const coverage = await pool.query<{ attempt_id: string; paper: number; logged: number; blank_but_correct: number }>(
+      `SELECT t.id AS attempt_id,
+              (SELECT count(*)::int FROM exam_attempt_questions q WHERE q.attempt_id = t.id) AS paper,
+              (SELECT count(*)::int FROM learning_attempt_events e WHERE e.source_attempt_type = 'exam_attempt' AND e.source_attempt_id = t.id) AS logged,
+              (SELECT count(*)::int FROM learning_attempt_events e WHERE e.source_attempt_id = t.id AND NOT e.answered AND e.correct) AS blank_but_correct
+       FROM exam_attempts t JOIN exam_results r ON r.attempt_id = t.id
+       WHERE t.definition_id = $1`, [examId],
+    );
+    expect(coverage.rows.length).toBeGreaterThanOrEqual(2);
+    for (const row of coverage.rows) {
+      expect(row.logged).toBe(row.paper);
+      expect(row.blank_but_correct).toBe(0);
+    }
   });
 });
 
@@ -398,16 +432,25 @@ describe('notifications backbone (mobile foundation)', () => {
 });
 
 describe('DPDP consent capture', () => {
-  it('is dormant until a notice version is configured', async () => {
-    delete process.env.CONSENT_PRIVACY_NOTICE_VERSION;
+  // The source of truth is the consent registry (migration 0028) rather than an
+  // environment variable, so "publish a notice" is a row and "retire it" is a column.
+  const publish = (version: string): Promise<unknown> => pool.query(
+    `INSERT INTO consent_definitions (consent_key, version, title, enforcement)
+     VALUES ('privacy-notice', $1, 'Privacy notice', 'BLOCKING')`, [version],
+  );
+  const retire = (version: string): Promise<unknown> => pool.query(
+    "UPDATE consent_definitions SET retired_at = now() WHERE consent_key='privacy-notice' AND version=$1", [version],
+  );
+
+  it('is dormant until a notice version is published', async () => {
     const status = await api().get('/api/v1/me/consents/privacy-notice').set(auth(studentToken));
     expect(status.status).toBe(200);
     expect(status.body.required).toBe(false);
     expect(status.body.requiredVersion).toBeNull();
   });
 
-  it('requires, records and clears consent for the configured version only', async () => {
-    process.env.CONSENT_PRIVACY_NOTICE_VERSION = '2026-09-v1';
+  it('requires, records and clears consent for the published version only', async () => {
+    await publish('2026-09-v1');
     try {
       const before = await api().get('/api/v1/me/consents/privacy-notice').set(auth(studentToken));
       expect(before.body.required).toBe(true);
@@ -427,12 +470,71 @@ describe('DPDP consent capture', () => {
       expect(after.body.required).toBe(false);
       expect(after.body.grantedVersion).toBe('2026-09-v1');
 
-      // A new notice version re-arms the gate: consent is per version.
-      process.env.CONSENT_PRIVACY_NOTICE_VERSION = '2026-12-v2';
+      // Withdrawal re-arms the gate and is recorded against the version held.
+      const withdrawn = await api().post('/api/v1/me/consents/privacy-notice/withdraw').set(auth(studentToken)).send({});
+      expect(withdrawn.status).toBe(201);
+      expect(withdrawn.body.blocksProductUse).toBe(true);
+      const afterWithdrawal = await api().get('/api/v1/me/consents/privacy-notice').set(auth(studentToken));
+      expect(afterWithdrawal.body.required).toBe(true);
+
+      // A new notice version re-arms the gate too: consent is per version.
+      await retire('2026-09-v1');
+      await publish('2026-12-v2');
       const rearmed = await api().get('/api/v1/me/consents/privacy-notice').set(auth(studentToken));
       expect(rearmed.body.required).toBe(true);
+      expect(rearmed.body.requiredVersion).toBe('2026-12-v2');
     } finally {
-      delete process.env.CONSENT_PRIVACY_NOTICE_VERSION;
+      await pool.query("UPDATE consent_definitions SET retired_at = now() WHERE consent_key='privacy-notice' AND retired_at IS NULL");
+    }
+  });
+
+  // ENG-05: adaptive-learning gates the skill state projection. A grant asks the worker to project
+  // the student's history; a withdrawal removes the projection in the request that records it.
+  it('asks for a projection on an adaptive-learning grant and deletes it on withdrawal', async () => {
+    await pool.query(`INSERT INTO consent_definitions (consent_key, version, title, enforcement, withdrawable)
+      VALUES ('adaptive-learning', 'eng05-api-test', 'Synthetic adaptive learning purpose', 'OPTIONAL', true)`);
+    try {
+      const granted = await api().post('/api/v1/me/consents/adaptive-learning/grant').set(auth(studentToken))
+        .send({ version: 'eng05-api-test' });
+      expect(granted.status).toBe(201);
+      const requests = await pool.query(
+        `SELECT payload FROM outbox_events WHERE event_type = 'learning.skill_state.projection_requested' AND aggregate_id = $1`,
+        [studentUserId],
+      );
+      expect(requests.rows.map((row) => row.payload)).toContainEqual({ subjectUserId: studentUserId, reason: 'CONSENT_GRANTED' });
+
+      // A projection row, written as the projector writes it.
+      const topicId = randomUUID();
+      const revisionId = randomUUID();
+      await pool.query(
+        `INSERT INTO content_revisions (id, entity_type, entity_id, revision, author_user_id, state, content_hash, body)
+         VALUES ($1,'TOPIC',$2,1,$3,'DRAFT',$4,'{}')`, [revisionId, topicId, studentUserId, 'f'.repeat(64)],
+      );
+      await pool.query(
+        `INSERT INTO taxonomy_nodes (id, kind, stable_key, version, name, description, content_revision_id)
+         VALUES ($1,'TOPIC',$2,1,'Synthetic topic','Synthetic topic for the consent test',$3)`, [topicId, `consent-topic-${topicId}`, revisionId],
+      );
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query("SELECT set_config('one.learner_skill_state_writer', 'learner-skill-state-projector', true)");
+        await client.query(
+          `INSERT INTO learner_skill_state (subject_user_id, skill_id, attempt_count, attempt_day_count, unaided_success_count,
+             unaided_success_day_count, assisted_success_count, last_attempt_at, evidence_stage, evidence_band, algorithm_version)
+           VALUES ($1,$2,1,1,1,1,0,now(),'RETAINED','NOT_ENOUGH_EVIDENCE','learner-skill-state-v1')`, [studentUserId, topicId],
+        );
+        await client.query('COMMIT');
+      } finally {
+        client.release();
+      }
+
+      const withdrawn = await api().post('/api/v1/me/consents/adaptive-learning/withdraw').set(auth(studentToken)).send({});
+      expect(withdrawn.status).toBe(201);
+      expect(withdrawn.body.withdrawn).toBe(true);
+      const left = await pool.query('SELECT count(*)::int AS count FROM learner_skill_state WHERE subject_user_id = $1', [studentUserId]);
+      expect(left.rows[0].count).toBe(0);
+    } finally {
+      await pool.query("UPDATE consent_definitions SET retired_at = now() WHERE consent_key='adaptive-learning' AND retired_at IS NULL");
     }
   });
 });

@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Award, BookOpen, Bookmark, Briefcase, Building2, CheckCircle2, ClipboardCheck, Code2, Database, FileText, Flame, Landmark, Layers, LineChart, Mail, Map, PenTool, Search, Sparkles, Star, Target, Trophy, Upload, Wrench } from 'lucide-react';
-import { MultiRing, Ring, WeekBars, toneColor } from './pilotComponents.js';
+import { Icon, type IconName } from '../icons/Icon.js';
+import { MultiRing, Ring, WeekBars, toneColor, toneMix } from './pilotComponents.js';
 import {
   tabAptitudeSets, tabMockInterviews, tabPrepQuestionSets, tabProblemSets,
   tabResumeExamples, tabSavedResources, tabToolGroups,
@@ -35,10 +35,10 @@ const PRACTICE_RECOMMENDED = [
 ] as const;
 
 const PRACTICE_SKILLS = [
-  ['Data Structures', 238, Database], ['Algorithms', 312, Code2], ['Database', 96, Database],
-  ['Web Development', 184, Layers], ['System Design', 92, Landmark], ['Operating Systems', 76, Wrench],
-  ['Object Oriented', 145, Layers], ['Core CS', 68, BookOpen], ['Machine Learning', 54, LineChart],
-  ['Aptitude', 120, Target],
+  ['Data Structures', 238, 'system-health'], ['Algorithms', 312, 'practice'], ['Database', 96, 'system-health'],
+  ['Web Development', 184, 'batches'], ['System Design', 92, 'departments'], ['Operating Systems', 76, 'tools'],
+  ['Object Oriented', 145, 'batches'], ['Core CS', 68, 'learning'], ['Machine Learning', 54, 'learning'],
+  ['Aptitude', 120, 'targets'],
 ] as const;
 
 const PRACTICE_CONTESTS = [
@@ -65,7 +65,7 @@ export function PilotPractice(): React.ReactElement {
           <div className="pilot-list">
             {(tabProblemSets[tabLabel] ?? []).map((entry) => (
               <div key={entry.title} className="pilot-list-row">
-                <span className="pilot-tile blue" style={{ width: 34, height: 34 }}><Code2 size={15} /></span>
+                <span className="pilot-tile blue" style={{ width: 34, height: 34 }}><Icon name="practice" size={16} /></span>
                 <div className="grow"><strong style={{ fontSize: 12.5 }}>{entry.title}</strong><small>{entry.detail}</small></div>
                 <span className="pilot-chip slate">{entry.meta}</span>
                 <button type="button" className="pilot-btn ghost small">{tabLabel === 'Contests' ? (entry.meta === 'Results' ? 'View Results' : 'Register') : 'Open'}</button>
@@ -78,11 +78,11 @@ export function PilotPractice(): React.ReactElement {
       {tab === 0 ? <>
       <section className="pilot-hero">
         <div style={{ display: 'flex', gap: 26, flexWrap: 'wrap' }}>
-          <div className="pilot-stat"><span className="pilot-tile green"><Code2 size={17} /></span><div><b>384</b><small>Problems Solved</small></div></div>
-          <div className="pilot-stat"><span className="pilot-tile amber"><Trophy size={17} /></span><div><b>6</b><small>Contests Participated</small></div></div>
-          <div className="pilot-stat"><span className="pilot-tile blue"><ClipboardCheck size={17} /></span><div><b>{pilotCanon.practiceHours} hrs</b><small>Practice Time</small></div></div>
-          <div className="pilot-stat"><span className="pilot-tile rose"><Flame size={17} /></span><div><b>{pilotCanon.streakDays}</b><small>Day Streak</small></div></div>
-          <div className="pilot-stat"><span className="pilot-tile teal"><LineChart size={17} /></span><div><b>82%</b><small>Success Rate</small></div></div>
+          <div className="pilot-stat"><span className="pilot-tile green"><Icon name="practice" size={16} /></span><div><b>384</b><small>Problems Solved</small></div></div>
+          <div className="pilot-stat"><span className="pilot-tile amber"><Icon name="offers" size={16} /></span><div><b>6</b><small>Contests Participated</small></div></div>
+          <div className="pilot-stat"><span className="pilot-tile blue"><Icon name="assessments" size={16} /></span><div><b>{pilotCanon.practiceHours} hrs</b><small>Practice Time</small></div></div>
+          <div className="pilot-stat"><span className="pilot-tile rose"><Icon name="skills" size={16} /></span><div><b>{pilotCanon.streakDays}</b><small>Day Streak</small></div></div>
+          <div className="pilot-stat"><span className="pilot-tile teal"><Icon name="analytics" size={16} /></span><div><b>82%</b><small>Success Rate</small></div></div>
         </div>
       </section>
 
@@ -91,7 +91,7 @@ export function PilotPractice(): React.ReactElement {
         <div className="pilot-row cols-5">
           {PRACTICE_CONTINUE.map((entry) => (
             <div key={entry.title} className="pilot-course-card">
-              <span className="pilot-tile" style={{ background: `${toneColor(entry.tone)}1a`, color: toneColor(entry.tone) }}><Code2 size={17} /></span>
+              <span className="pilot-tile" style={{ background: toneMix(entry.tone, 10), color: toneColor(entry.tone) }}><Icon name="practice" size={16} /></span>
               <strong>{entry.title}</strong>
               <small>{entry.kind}</small>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -109,7 +109,7 @@ export function PilotPractice(): React.ReactElement {
         <div className="pilot-row cols-5">
           {PRACTICE_RECOMMENDED.map((entry) => (
             <div key={entry.title} className="pilot-course-card">
-              <span className="pilot-tile" style={{ background: `${toneColor(entry.tone)}1a`, color: toneColor(entry.tone) }}><Target size={17} /></span>
+              <span className="pilot-tile" style={{ background: toneMix(entry.tone, 10), color: toneColor(entry.tone) }}><Icon name="targets" size={16} /></span>
               <strong>{entry.title}</strong>
               <span className={`pilot-chip ${entry.difficulty === 'Easy' ? 'green' : 'amber'}`}>{entry.difficulty}</span>
               <small>{entry.problems} problems</small>
@@ -122,9 +122,9 @@ export function PilotPractice(): React.ReactElement {
       <section className="pilot-card">
         <div className="pilot-card-head"><h2>Practice by Skill</h2><button type="button" className="pilot-link">View All Skills</button></div>
         <div className="pilot-row cols-5">
-          {PRACTICE_SKILLS.map(([label, count, Icon]) => (
+          {PRACTICE_SKILLS.map(([label, count, glyph]) => (
             <div key={label as string} className="pilot-cat">
-              {(() => { const Component = Icon as typeof Target; return <span className="pilot-tile blue" style={{ width: 32, height: 32 }}><Component size={14} /></span>; })()}
+              <span className="pilot-tile blue" style={{ width: 32, height: 32 }}><Icon name={glyph as IconName} size={16} /></span>
               <div><strong>{label as string}</strong><small>{count as number} problems</small></div>
             </div>
           ))}
@@ -165,7 +165,7 @@ export function PilotPractice(): React.ReactElement {
           ))}
         </div>
       </section>
-      <div className="pilot-banner"><Sparkles size={17} /> Consistency is the key to mastery. Solve daily, learn continuously.</div>
+      <div className="pilot-banner"><Icon name="coach" size={16} /> Consistency is the key to mastery. Solve daily, learn continuously.</div>
     </aside> : null}
   </div>;
 }
@@ -198,7 +198,7 @@ function PrepList({ title, rows, action }: { readonly title: string; readonly ro
     <div className="pilot-list">
       {rows.map((row) => (
         <div key={row.title} className="pilot-list-row">
-          <span className="pilot-tile purple" style={{ width: 34, height: 34 }}><Briefcase size={15} /></span>
+          <span className="pilot-tile purple" style={{ width: 34, height: 34 }}><Icon name="opportunities" size={16} /></span>
           <div className="grow"><strong style={{ fontSize: 12.5 }}>{row.title}</strong><small>{row.detail}</small></div>
           <button type="button" className="pilot-btn ghost small">{action}</button>
         </div>
@@ -239,7 +239,7 @@ export function PilotCompanyPrep(): React.ReactElement {
           <div className="pilot-list">
             {tabMockInterviews.map((session) => (
               <div key={session.title} className="pilot-list-row">
-                <span className={`pilot-tile ${session.done ? 'green' : 'purple'}`} style={{ width: 34, height: 34 }}><CheckCircle2 size={15} /></span>
+                <span className={`pilot-tile ${session.done ? 'green' : 'purple'}`} style={{ width: 34, height: 34 }}><Icon name="check" size={16} /></span>
                 <div className="grow"><strong style={{ fontSize: 12.5 }}>{session.title}</strong><small>{session.detail}</small></div>
                 <button type="button" className="pilot-btn ghost small">{session.done ? 'View Feedback' : 'Book Slot'}</button>
               </div>
@@ -256,11 +256,11 @@ export function PilotCompanyPrep(): React.ReactElement {
           <p>Access company-specific resources, real interview questions and guided preparation.</p>
           <div className="pilot-row cols-4" style={{ marginTop: 12 }}>
             {[
-              ['Companies', '24', 'blue', Building2], ['Interview Experiences', '168', 'purple', Mail],
-              ['Questions Solved', '320', 'green', CheckCircle2], ['Profile Match', '85%', 'amber', Target],
-            ].map(([label, value, tone, Icon]) => (
+              ['Companies', '24', 'blue', 'company'], ['Interview Experiences', '168', 'purple', 'interviews'],
+              ['Questions Solved', '320', 'green', 'check'], ['Profile Match', '85%', 'amber', 'profile'],
+            ].map(([label, value, tone, glyph]) => (
               <div key={label as string} className="pilot-stat">
-                {(() => { const Component = Icon as typeof Target; return <span className={`pilot-tile ${tone as string}`}><Component size={16} /></span>; })()}
+                <span className={`pilot-tile ${tone as string}`}><Icon name={glyph as IconName} size={16} /></span>
                 <div><b>{value as string}</b><small>{label as string}</small></div>
               </div>
             ))}
@@ -288,7 +288,7 @@ export function PilotCompanyPrep(): React.ReactElement {
         <div className="pilot-row cols-5">
           {PREP_TOOLS.map((tool) => (
             <div key={tool.title} className="pilot-course-card">
-              <span className="pilot-tile" style={{ background: `${toneColor(tool.tone)}1a`, color: toneColor(tool.tone) }}><Briefcase size={17} /></span>
+              <span className="pilot-tile" style={{ background: toneMix(tool.tone, 10), color: toneColor(tool.tone) }}><Icon name="opportunities" size={16} /></span>
               <strong>{tool.title}</strong>
               <small>{tool.detail}</small>
               <button type="button" className="pilot-btn ghost small">{tool.action} →</button>
@@ -332,14 +332,14 @@ export function PilotCompanyPrep(): React.ReactElement {
         <div className="pilot-list">
           {PREP_RESOURCES.map(([title, views]) => (
             <div key={title} className="pilot-list-row" style={{ padding: '8px 2px' }}>
-              <FileText size={15} color="#1f55e5" />
+              <Icon name="documents" size={16} style={{ color: "#1f55e5" }} />
               <div className="grow"><strong style={{ fontSize: 12.5 }}>{title}</strong></div>
               <small>{views}</small>
             </div>
           ))}
         </div>
       </section>
-      <div className="pilot-banner"><Sparkles size={17} /> Consistent practice and mock interviews sharply improve selection chances.</div>
+      <div className="pilot-banner"><Icon name="coach" size={16} /> Consistent practice and mock interviews sharply improve selection chances.</div>
     </aside> : null}
   </div>;
 }
@@ -349,14 +349,14 @@ export function PilotCompanyPrep(): React.ReactElement {
 // ---------------------------------------------------------------------------
 
 const CAREER_TOOLS = [
-  { title: 'Resume Builder', detail: 'Create professional resumes with ready templates.', action: 'Create Resume', icon: FileText, tone: 'purple' },
-  { title: 'Cover Letter Builder', detail: 'Write tailored cover letters for any role.', action: 'Create Cover Letter', icon: Mail, tone: 'green' },
-  { title: 'Portfolio Builder', detail: 'Build an impressive portfolio to showcase your work.', action: 'Build Portfolio', icon: Briefcase, tone: 'amber' },
-  { title: 'Interview Question Bank', detail: 'Role-wise and company-wise interview questions.', action: 'Explore Questions', icon: BookOpen, tone: 'blue' },
-  { title: 'Salary Explorer', detail: 'Explore salary insights by role, company and location.', action: 'Explore Salaries', icon: LineChart, tone: 'teal' },
-  { title: 'Career Roadmap Planner', detail: 'Plan your career path with customised roadmaps.', action: 'Plan Roadmap', icon: Map, tone: 'indigo' },
-  { title: 'Goal Tracker', detail: 'Set goals and track your progress in one place.', action: 'Track Goals', icon: Target, tone: 'rose' },
-  { title: 'Skill Gap Analyzer', detail: 'Find the skills you need to reach your goals.', action: 'Analyze Skills', icon: Search, tone: 'purple' },
+  { title: 'Resume Builder', detail: 'Create professional resumes with ready templates.', action: 'Create Resume', icon: 'resume', tone: 'purple' },
+  { title: 'Cover Letter Builder', detail: 'Write tailored cover letters for any role.', action: 'Create Cover Letter', icon: 'message', tone: 'green' },
+  { title: 'Portfolio Builder', detail: 'Build an impressive portfolio to showcase your work.', action: 'Build Portfolio', icon: 'opportunities', tone: 'amber' },
+  { title: 'Interview Question Bank', detail: 'Role-wise and company-wise interview questions.', action: 'Explore Questions', icon: 'interviews', tone: 'blue' },
+  { title: 'Salary Explorer', detail: 'Explore salary insights by role, company and location.', action: 'Explore Salaries', icon: 'analytics', tone: 'teal' },
+  { title: 'Career Roadmap Planner', detail: 'Plan your career path with customised roadmaps.', action: 'Plan Roadmap', icon: 'territory', tone: 'indigo' },
+  { title: 'Goal Tracker', detail: 'Set goals and track your progress in one place.', action: 'Track Goals', icon: 'targets', tone: 'rose' },
+  { title: 'Skill Gap Analyzer', detail: 'Find the skills you need to reach your goals.', action: 'Analyze Skills', icon: 'skills', tone: 'purple' },
 ] as const;
 
 const TOOLS_RECENT = [
@@ -382,7 +382,7 @@ export function PilotCareerTools(): React.ReactElement {
           <div className="pilot-row cols-3">
             {groupTools.map((tool) => (
               <div key={tool.title} className="pilot-course-card">
-                {(() => { const Component = tool.icon; return <span className="pilot-tile" style={{ background: `${toneColor(tool.tone)}1a`, color: toneColor(tool.tone) }}><Component size={17} /></span>; })()}
+                {(<span className="pilot-tile" style={{ background: toneMix(tool.tone, 10), color: toneColor(tool.tone) }}><Icon name={tool.icon} size={16} /></span>)}
                 <strong>{tool.title}</strong>
                 <small>{tool.detail}</small>
                 <button type="button" className="pilot-btn ghost small">{tool.action} →</button>
@@ -398,9 +398,9 @@ export function PilotCareerTools(): React.ReactElement {
           <h2>Tools that empower your career growth</h2>
           <p>Use smart tools and resources to build your profile, enhance skills and achieve goals faster.</p>
           <div className="pilot-row cols-3" style={{ marginTop: 12 }}>
-            <div className="pilot-stat"><span className="pilot-tile blue"><Wrench size={16} /></span><div><b>18</b><small>Tools Available</small></div></div>
-            <div className="pilot-stat"><span className="pilot-tile green"><CheckCircle2 size={16} /></span><div><b>7</b><small>Tools Used</small></div></div>
-            <div className="pilot-stat"><span className="pilot-tile amber"><Star size={16} /></span><div><b>{pilotPersona.profileComplete}%</b><small>Profile Strength</small></div></div>
+            <div className="pilot-stat"><span className="pilot-tile blue"><Icon name="tools" size={16} /></span><div><b>18</b><small>Tools Available</small></div></div>
+            <div className="pilot-stat"><span className="pilot-tile green"><Icon name="check" size={16} /></span><div><b>7</b><small>Tools Used</small></div></div>
+            <div className="pilot-stat"><span className="pilot-tile amber"><Icon name="offers" size={16} /></span><div><b>{pilotPersona.profileComplete}%</b><small>Profile Strength</small></div></div>
           </div>
         </div>
       </section>
@@ -410,7 +410,7 @@ export function PilotCareerTools(): React.ReactElement {
         <div className="pilot-row cols-4">
           {CAREER_TOOLS.map((tool) => (
             <div key={tool.title} className="pilot-course-card">
-              {(() => { const Component = tool.icon; return <span className="pilot-tile" style={{ background: `${toneColor(tool.tone)}1a`, color: toneColor(tool.tone) }}><Component size={17} /></span>; })()}
+              {(<span className="pilot-tile" style={{ background: toneMix(tool.tone, 10), color: toneColor(tool.tone) }}><Icon name={tool.icon} size={16} /></span>)}
               <strong>{tool.title}</strong>
               <small>{tool.detail}</small>
               <button type="button" className="pilot-btn ghost small">{tool.action} →</button>
@@ -424,7 +424,7 @@ export function PilotCareerTools(): React.ReactElement {
         <div className="pilot-list">
           {TOOLS_RECENT.map(([title, when]) => (
             <div key={title} className="pilot-list-row">
-              <span className="pilot-tile indigo" style={{ width: 34, height: 34 }}><Wrench size={15} /></span>
+              <span className="pilot-tile indigo" style={{ width: 34, height: 34 }}><Icon name="tools" size={16} /></span>
               <div className="grow"><strong style={{ fontSize: 12.5 }}>{title}</strong><small>{when}</small></div>
               <button type="button" className="pilot-btn ghost small">Open</button>
             </div>
@@ -459,7 +459,7 @@ export function PilotCareerTools(): React.ReactElement {
             ['Placement Predictor', 'Get insights on your placement chances.'],
           ].map(([title, detail]) => (
             <div key={title} className="pilot-list-row" style={{ padding: '9px 2px' }}>
-              <span className="pilot-tile teal" style={{ width: 32, height: 32 }}><Sparkles size={14} /></span>
+              <span className="pilot-tile teal" style={{ width: 32, height: 32 }}><Icon name="coach" size={16} /></span>
               <div className="grow"><strong style={{ fontSize: 12.5 }}>{title}</strong><small>{detail}</small></div>
             </div>
           ))}
@@ -468,9 +468,9 @@ export function PilotCareerTools(): React.ReactElement {
       <section className="pilot-card">
         <h2>Quick Actions</h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <button type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}><Upload size={15} /> Upload Resume</button>
-          <button type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}><Map size={15} /> Create New Roadmap</button>
-          <button type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}><Target size={15} /> Add New Goal</button>
+          <button type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}><Icon name="upload" size={16} /> Upload Resume</button>
+          <button type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}><Icon name="territory" size={16} /> Create New Roadmap</button>
+          <button type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}><Icon name="targets" size={16} /> Add New Goal</button>
         </div>
       </section>
     </aside> : null}
@@ -546,12 +546,12 @@ export function PilotScholarships(): React.ReactElement {
           <p>Track your applications and never miss an opportunity.</p>
           <div className="pilot-row cols-5" style={{ marginTop: 12 }}>
             {[
-              ['Available', '24', 'blue', Landmark], ['Applied', '7', 'indigo', PenTool],
-              ['Shortlisted', '2', 'green', CheckCircle2], ['Awarded', '1', 'amber', Award],
-              ['Potential Value', '₹1.25L', 'purple', Star],
-            ].map(([label, value, tone, Icon]) => (
+              ['Available', '24', 'blue', 'departments'], ['Applied', '7', 'indigo', 'edit'],
+              ['Shortlisted', '2', 'green', 'check'], ['Awarded', '1', 'amber', 'offers'],
+              ['Potential Value', '₹1.25L', 'purple', 'offers'],
+            ].map(([label, value, tone, glyph]) => (
               <div key={label as string} className="pilot-stat">
-                {(() => { const Component = Icon as typeof Award; return <span className={`pilot-tile ${tone as string}`}><Component size={16} /></span>; })()}
+                <span className={`pilot-tile ${tone as string}`}><Icon name={glyph as IconName} size={16} /></span>
                 <div><b>{value as string}</b><small>{label as string}</small></div>
               </div>
             ))}
@@ -572,7 +572,7 @@ export function PilotScholarships(): React.ReactElement {
               </div>
               <span className={`pilot-chip ${scholarship.kind === 'Need Based' ? 'blue' : scholarship.kind === 'Merit + Need' ? 'amber' : 'green'}`}>{scholarship.kind}</span>
               <b style={{ fontSize: 13, whiteSpace: 'nowrap' }}>Up to {scholarship.amount}</b>
-              <Bookmark size={15} color="#98a5ba" />
+              <Icon name="career" size={16} style={{ color: "#98a5ba" }} />
               <button type="button" className="pilot-btn small">Apply Now</button>
             </div>
           ))}
@@ -586,7 +586,7 @@ export function PilotScholarships(): React.ReactElement {
             ['Engineering', 8], ['Computer Science', 6], ['Commerce', 4], ['Arts & Humanities', 3], ['General', 3],
           ].map(([label, count]) => (
             <div key={label as string} className="pilot-cat">
-              <span className="pilot-tile purple" style={{ width: 32, height: 32 }}><Landmark size={14} /></span>
+              <span className="pilot-tile purple" style={{ width: 32, height: 32 }}><Icon name="departments" size={16} /></span>
               <div><strong>{label as string}</strong><small>{count as number} Scholarships</small></div>
             </div>
           ))}
@@ -628,11 +628,11 @@ export function PilotScholarships(): React.ReactElement {
         <h2>Application Tracker</h2>
         <div className="pilot-row cols-4" style={{ textAlign: 'center' }}>
           {[['7', 'Applied', 'blue'], ['2', 'Shortlisted', 'purple'], ['1', 'Awarded', 'green'], ['2', 'Closed', 'rose']].map(([value, label, tone]) => (
-            <div key={label}><span className={`pilot-tile ${tone}`} style={{ margin: '0 auto 6px' }}><Award size={16} /></span><b style={{ fontSize: 16 }}>{value}</b><small style={{ display: 'block', color: 'var(--p-muted)', fontSize: 10.5 }}>{label}</small></div>
+            <div key={label}><span className={`pilot-tile ${tone}`} style={{ margin: '0 auto 6px' }}><Icon name="offers" size={16} /></span><b style={{ fontSize: 16 }}>{value}</b><small style={{ display: 'block', color: 'var(--p-muted)', fontSize: 10.5 }}>{label}</small></div>
           ))}
         </div>
       </section>
-      <div className="pilot-banner"><Sparkles size={17} /> Complete your profile to get better scholarship recommendations.</div>
+      <div className="pilot-banner"><Icon name="coach" size={16} /> Complete your profile to get better scholarship recommendations.</div>
     </aside> : null}
   </div>;
 }
@@ -667,7 +667,7 @@ export function PilotResumeBuilder(): React.ReactElement {
     <div className="pilot-content">
       <div className="pilot-page-head">
         <div><h1>Resume Builder</h1><p>Create professional resumes that showcase your skills and land your dream job.</p></div>
-        <button type="button" className="pilot-btn"><FileText size={15} /> Create New Resume</button>
+        <button type="button" className="pilot-btn"><Icon name="documents" size={16} /> Create New Resume</button>
       </div>
       <PilotTabs labels={['My Resumes', 'Templates', 'Examples', 'Resume Score']} active={tab} onChange={setTab} />
 
@@ -677,7 +677,7 @@ export function PilotResumeBuilder(): React.ReactElement {
           <div className="pilot-list">
             {tabResumeExamples.map((example) => (
               <div key={example.title} className="pilot-list-row">
-                <span className="pilot-tile teal" style={{ width: 34, height: 34 }}><FileText size={15} /></span>
+                <span className="pilot-tile teal" style={{ width: 34, height: 34 }}><Icon name="documents" size={16} /></span>
                 <div className="grow"><strong style={{ fontSize: 12.5 }}>{example.title}</strong><small>{example.detail}</small></div>
                 <button type="button" className="pilot-btn ghost small">Open Example</button>
               </div>
@@ -704,7 +704,7 @@ export function PilotResumeBuilder(): React.ReactElement {
               'Impact verbs: replace "worked on" with "built", "shipped", "led".',
             ].map((tip) => (
               <div key={tip} className="pilot-list-row" style={{ padding: '8px 2px' }}>
-                <Sparkles size={14} color="#b45309" style={{ flexShrink: 0 }} />
+                <Icon name="coach" size={16} style={{ color: "#b45309", flexShrink: 0 }} />
                 <small style={{ color: 'var(--p-ink-2)' }}>{tip}</small>
               </div>
             ))}
@@ -721,7 +721,7 @@ export function PilotResumeBuilder(): React.ReactElement {
             const isSelected = template.name === selectedTemplate;
             return (
               <div key={template.name} className="pilot-course-card" style={isSelected ? { outline: '2px solid #1f55e5', outlineOffset: 1 } : undefined}>
-                <div className="pilot-course-art" style={{ background: isSelected ? 'linear-gradient(135deg, #1d4ed8, #1e3a8a)' : 'linear-gradient(135deg, #64748b, #334155)' }}><FileText size={22} /></div>
+                <div className="pilot-course-art" style={{ background: isSelected ? 'linear-gradient(135deg, #1d4ed8, #1e3a8a)' : 'linear-gradient(135deg, #64748b, #334155)' }}><Icon name="documents" size={24} /></div>
                 <strong>{template.name}</strong>
                 <small>{template.note}</small>
                 <button type="button" className={`pilot-btn small ${isSelected ? '' : 'ghost'}`} disabled={isSelected}
@@ -739,7 +739,7 @@ export function PilotResumeBuilder(): React.ReactElement {
         <div className="pilot-row cols-5">
           {RESUME_TOOLS.map((tool) => (
             <div key={tool.title} className="pilot-course-card">
-              <span className="pilot-tile" style={{ background: `${toneColor(tool.tone)}1a`, color: toneColor(tool.tone) }}><PenTool size={17} /></span>
+              <span className="pilot-tile" style={{ background: toneMix(tool.tone, 10), color: toneColor(tool.tone) }}><Icon name="edit" size={16} /></span>
               <strong>{tool.title}</strong>
               <small>{tool.detail}</small>
               <button type="button" className="pilot-btn ghost small">{tool.action} →</button>
@@ -756,7 +756,7 @@ export function PilotResumeBuilder(): React.ReactElement {
             ['Quantify achievements', 'Use numbers & results'], ['Tailor to the job', 'Customise for each role'],
           ].map(([title, detail]) => (
             <div key={title} style={{ display: 'flex', gap: 10 }}>
-              <CheckCircle2 size={16} color="#0d6b4f" style={{ flexShrink: 0, marginTop: 2 }} />
+              <Icon name="check" size={16} style={{ color: "#0d6b4f", flexShrink: 0, marginTop: 2 }} />
               <div><strong style={{ fontSize: 12.5, display: 'block' }}>{title}</strong><small style={{ color: 'var(--p-muted)' }}>{detail}</small></div>
             </div>
           ))}
@@ -784,7 +784,7 @@ export function PilotResumeBuilder(): React.ReactElement {
         <div className="pilot-list">
           {RECENT_RESUMES.map(([title, when, score]) => (
             <div key={title as string} className="pilot-list-row">
-              <span className="pilot-tile blue" style={{ width: 34, height: 34 }}><FileText size={15} /></span>
+              <span className="pilot-tile blue" style={{ width: 34, height: 34 }}><Icon name="documents" size={16} /></span>
               <div className="grow"><strong style={{ fontSize: 12.5 }}>{title as string}</strong><small>{when as string}</small></div>
               <span className={`pilot-chip ${(score as number) >= 75 ? 'green' : 'amber'}`}>{score as number}</span>
             </div>
@@ -800,7 +800,7 @@ export function PilotResumeBuilder(): React.ReactElement {
             ['Skills to add in 2027', 'Top in-demand skills by industry'],
           ].map(([title, detail]) => (
             <div key={title} className="pilot-list-row" style={{ padding: '9px 2px' }}>
-              <span className="pilot-tile amber" style={{ width: 32, height: 32 }}><Sparkles size={14} /></span>
+              <span className="pilot-tile amber" style={{ width: 32, height: 32 }}><Icon name="coach" size={16} /></span>
               <div className="grow"><strong style={{ fontSize: 12.5 }}>{title}</strong><small>{detail}</small></div>
             </div>
           ))}

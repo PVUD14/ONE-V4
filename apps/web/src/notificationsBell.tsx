@@ -1,11 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bell, MessageSquare } from 'lucide-react';
+import { Icon } from './icons/Icon.js';
 import { getProtectedAccessToken, listMyNotifications, listStudentExams, markAllNotificationsRead } from './api.js';
+import { formatDateTime } from './dates.js';
 
 interface DerivedNotification {
   readonly id: string;
   readonly text: string;
   readonly actionable: boolean;
+  /** INST-06: a college announcement, shown in its own list with who it is from. */
+  readonly announcement?: { readonly title: string; readonly body: string; readonly from: string };
+}
+
+/** "From your faculty · Section X, Local College" — only what the server sent; nothing invented. */
+function announcementSource(data: Record<string, string> | undefined): string {
+  const from = data?.['from'];
+  const audience = data?.['audience'];
+  const institution = data?.['institutionName'];
+  const parts = [from ? `From ${from}` : '', [audience, audience !== institution ? institution : ''].filter(Boolean).join(', ')].filter(Boolean);
+  return parts.join(' · ') || 'From your college';
 }
 
 /**
@@ -33,14 +45,18 @@ export function StudentNotificationsBell(): React.ReactElement {
       if (exams.status === 'fulfilled') {
         for (const exam of exams.value.assessments) {
           if (exam.openAttemptId) {
-            merged.push({ id: `${exam.id}-open`, text: `Attempt in progress: ${exam.title} — resume before ${new Date(exam.endsAt).toLocaleString()}.`, actionable: true });
+            merged.push({ id: `${exam.id}-open`, text: `Attempt in progress: ${exam.title} — resume before ${formatDateTime(exam.endsAt)}.`, actionable: true });
           }
         }
       }
       if (feed.status === 'fulfilled') {
         setUnread(feed.value.unreadCount);
         for (const note of feed.value.notifications.slice(0, 20)) {
-          merged.push({ id: note.id, text: `${note.title} — ${note.body}`, actionable: note.readAt === null });
+          merged.push({
+            // OPS-16: a service status notice says it comes from AI8HT, not from the college.
+            id: note.id, text: note.kind === 'STATUS_NOTICE' ? `Service status notice from AI8HT: ${note.title} — ${note.body}` : `${note.title} — ${note.body}`, actionable: note.readAt === null,
+            ...(note.kind === 'ANNOUNCEMENT' ? { announcement: { title: note.title, body: note.body, from: announcementSource(note.data) } } : {}),
+          });
         }
       } else {
         setUnread(0);
@@ -67,23 +83,36 @@ export function StudentNotificationsBell(): React.ReactElement {
   }, [open]);
 
   const liveActionable = items.filter((item) => item.id.endsWith('-open')).length;
+  const announcements = items.filter((item) => item.announcement);
+  const others = items.filter((item) => !item.announcement);
   const badgeCount = unread + liveActionable;
 
   return (
     <div className="notify-bell" ref={containerRef}>
       <button className="icon-button notification" type="button" aria-label="Notifications" aria-expanded={open}
         onClick={() => setOpen((value) => !value)}>
-        <Bell size={18} />
+        <Icon name="bell" size={20} />
         {badgeCount > 0 ? <span>{badgeCount}</span> : null}
       </button>
       {open ? (
         <div className="notify-flyout" role="dialog" aria-label="Notifications">
           <strong>Notifications</strong>
-          {items.length ? (
+          {announcements.length ? (
+            <>
+              <strong>Announcements</strong>
+              <ul aria-label="Announcements">
+                {announcements.map((item) => <li key={item.id} className={item.actionable ? 'actionable' : ''}>
+                  {item.announcement!.title} — {item.announcement!.body}<br /><small>{item.announcement!.from}</small>
+                </li>)}
+              </ul>
+            </>
+          ) : null}
+          {others.length ? (
             <ul>
-              {items.map((item) => <li key={item.id} className={item.actionable ? 'actionable' : ''}>{item.text}</li>)}
+              {others.map((item) => <li key={item.id} className={item.actionable ? 'actionable' : ''}>{item.text}</li>)}
             </ul>
-          ) : (
+          ) : null}
+          {items.length ? null : (
             <p>You&apos;re all caught up — nothing needs your attention.</p>
           )}
         </div>
@@ -113,7 +142,7 @@ export function StudentMessagesFlyout(): React.ReactElement {
     <div className="notify-bell" ref={containerRef}>
       <button className="icon-button" type="button" aria-label="Messages" aria-expanded={open}
         onClick={() => setOpen((value) => !value)}>
-        <MessageSquare size={18} />
+        <Icon name="message" size={20} />
       </button>
       {open ? (
         <div className="notify-flyout" role="dialog" aria-label="Messages">

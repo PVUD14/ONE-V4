@@ -1,0 +1,520 @@
+/*
+ * Momentum components (re-skin phase 4): buttons, fields, chips, status tags, cards, KPI tiles,
+ * tabs, segmented controls, tables, toasts, banners, modals, menus, progress, plus the three
+ * presentational components added in src/momentum/ (StatusTag, ReadinessBand, SmallCount).
+ *
+ * Built from the approved sheet (inventory 01-foundations/components.css and components.html)
+ * and its restyle table. It restyles the app's existing global classes (pilot-*, v2-*, role-*,
+ * staff-*, hiring-*, status-pill) in place rather than rewriting markup, so every screen picks
+ * the components up at once; screen layouts are left to the screen phases.
+ *
+ * It loads after styles.css and the shell, and matches the specificity of the rules it replaces
+ * (so it wins by order, never by !important). Pilot rules in pilot.css are scoped under .pilot,
+ * so the matching rules here use :is(.pilot, body) to apply inside and outside that scope.
+ *
+ * Colour rules: text on a soft fill uses the -ink token for that fill (4.5:1 or better in both
+ * themes); band colours are fills only; orange is the one warm accent (Offer, celebration).
+ */
+
+/* ---------- Theme-aware solid fills used below ---------- */
+:root, [data-theme], .t-light, .t-dark {
+  /* A solid brand button (not the hero gradient): white on brand-ink in light, deep ink on brand
+     in dark, both above 4.5:1. */
+  --btn-solid: var(--brand-ink);
+  --btn-solid-ink: #FFFFFF;
+  --cyan-soft: color-mix(in srgb, var(--cyan) 16%, var(--surface));
+}
+[data-theme="dark"], .t-dark { --btn-solid: var(--brand); --btn-solid-ink: var(--navy-950); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --btn-solid: var(--brand); --btn-solid-ink: var(--navy-950); }
+}
+
+/* Gold "celebration" tag (approved 2026-10-11): where a view already spends its one orange on a
+   streak, an Offer celebrates in gold instead. Built from the orange-300 token; text holds
+   6.6:1 (light) and 7.9:1 (dark) on its fill. */
+:root, [data-theme], .t-light, .t-dark {
+  --gold-soft: color-mix(in srgb, var(--orange-300) 30%, var(--surface));
+  --gold-ink: #6E4E00;
+}
+[data-theme="dark"], .t-dark { --gold-soft: color-mix(in srgb, var(--orange-300) 18%, var(--surface)); --gold-ink: var(--orange-300); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --gold-soft: color-mix(in srgb, var(--orange-300) 18%, var(--surface)); --gold-ink: var(--orange-300); }
+}
+
+/* =====================================================================================
+   BUTTONS
+   ===================================================================================== */
+
+/* Every unclassed action button: the solid brand button (the gradient is kept for the pilot
+   primary, so a dense staff table is not a wall of gradients). Same selector as styles.css. */
+button:not(.icon-button, .mobile-menu-button, .side-nav-item, .role-nav-item, .role-collapse, .collapse-button, .profile-menu, .drawer-scrim, .sidebar-close) {
+  min-height: 34px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: var(--r-lg);
+  background: var(--btn-solid);
+  color: var(--btn-solid-ink);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  transition: transform var(--m-micro) var(--e-out), box-shadow var(--m-micro) var(--e-out), background-color var(--m-micro), border-color var(--m-micro), filter var(--m-micro), color var(--m-micro);
+}
+button:not(.icon-button, .mobile-menu-button, .side-nav-item, .role-nav-item, .role-collapse, .collapse-button, .profile-menu, .drawer-scrim, .sidebar-close, .v2-list-row, .assistant-launcher):not(:disabled):hover {
+  filter: brightness(1.06);
+}
+button:not(.icon-button, .mobile-menu-button, .side-nav-item, .role-nav-item, .role-collapse, .collapse-button, .profile-menu, .drawer-scrim, .sidebar-close, .v2-list-row, .assistant-launcher):not(:disabled):active {
+  transform: scale(.97);
+  transition-duration: var(--m-press);
+}
+
+/* Secondary: the Momentum secondary button (.btn-s) — surface, hairline, brand border on hover. */
+button.secondary {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line-2);
+}
+button.secondary:not(:disabled):hover { border-color: var(--brand); filter: none; }
+
+/* Pilot buttons. An ordinary pilot button is the plain solid brand button; the hero gradient
+   (.btn-p) is kept for each page's one main action (approved 2026-10-11): a button marked
+   .primary, the action in a page head or a home hero, and the student home's next-step button.
+   Ghost is secondary; soft is brand-soft. */
+:is(.pilot, body) .pilot-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 36px; padding: 0 16px;
+  border: 0; border-radius: var(--r-xl);
+  background: var(--btn-solid); color: var(--btn-solid-ink);
+  box-shadow: none;
+  font: 600 13px/1.2 var(--font-sans);
+  text-decoration: none; cursor: pointer;
+  transition: transform var(--m-micro) var(--e-out), box-shadow var(--m-micro) var(--e-out), border-color var(--m-micro), filter var(--m-micro);
+}
+:is(.pilot, body) .pilot-btn:not(:disabled):hover { transform: translateY(-1px); filter: brightness(1.06); }
+:is(.pilot, body) :is(.pilot-btn.primary, .pilot-btn.sh-shine, .pilot-page-head .pilot-btn:not(.ghost, .soft), .ih-ta .pilot-btn:not(.ghost, .soft)):not(:disabled, [aria-disabled="true"]) {
+  background: var(--grad); color: #FFFFFF; box-shadow: var(--glow-btn);
+}
+:is(.pilot, body) :is(.pilot-btn.primary, .pilot-btn.sh-shine, .pilot-page-head .pilot-btn:not(.ghost, .soft), .ih-ta .pilot-btn:not(.ghost, .soft)):not(:disabled):hover {
+  box-shadow: var(--glow-btn-hover); filter: saturate(1.08) brightness(1.04);
+}
+:is(.pilot, body) .pilot-btn:not(:disabled):active { transform: translateY(0) scale(.97); transition-duration: var(--m-press); }
+:is(.pilot, body) .pilot-btn.ghost {
+  background: var(--surface); color: var(--text); border: 1px solid var(--line-2); box-shadow: none;
+}
+:is(.pilot, body) .pilot-btn.ghost:not(:disabled):hover { border-color: var(--brand); box-shadow: none; filter: none; }
+:is(.pilot, body) .pilot-btn.soft { background: var(--brand-soft); color: var(--brand-ink); box-shadow: none; }
+:is(.pilot, body) .pilot-btn.soft:not(:disabled):hover { box-shadow: none; filter: none; }
+:is(.pilot, body) .pilot-btn.small { min-height: var(--btn-h-sm); padding: 0 12px; font-size: 12.5px; border-radius: var(--r-lg); }
+:is(.pilot, body) .pilot-btn:disabled,
+:is(.pilot, body) .pilot-btn[aria-disabled="true"] {
+  background: var(--surface-3); color: var(--text-3); box-shadow: none; filter: none; transform: none; cursor: not-allowed; opacity: 1;
+}
+:is(.pilot, body) .pilot-btn.ghost:disabled { background: var(--surface-2); border-color: var(--line); }
+.v2-btn { border-radius: var(--r-xl); }
+
+/* Toggle groups (aria-pressed): the segmented control — the pressed item is a raised surface. */
+:is(.pilot, body) button[aria-pressed="false"]:not(.v2-list-row, .password-toggle, .icon-button),
+:is(.pilot, body) .pilot-btn[aria-pressed="false"] {
+  background: var(--surface-2); color: var(--text-2); border: 1px solid var(--line); box-shadow: none;
+}
+:is(.pilot, body) button[aria-pressed="true"]:not(.v2-list-row, .password-toggle, .icon-button),
+:is(.pilot, body) .pilot-btn[aria-pressed="true"] {
+  background: var(--surface); color: var(--text); border: 1px solid var(--brand);
+  box-shadow: 0 1px 2px rgb(10 16 48 / .08), 0 4px 10px -6px rgb(10 16 48 / .25);
+}
+:is(.pilot, body) button[aria-pressed]:not(.v2-list-row, .password-toggle, .icon-button):not(:disabled):hover { transform: none; filter: none; }
+
+/* Links that act as buttons inside cards */
+:is(.pilot, body) .pilot-link { color: var(--brand-ink); font-weight: 600; }
+:is(.pilot, body) .pilot-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* =====================================================================================
+   FORM FIELDS — h40 (the sheet's small field for dense screens), 1.5px line, brand focus ring
+   ===================================================================================== */
+:where(select, textarea, input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="hidden"], [type="submit"], [type="button"], [type="reset"], [type="image"])) {
+  min-height: 40px;
+  border: 1.5px solid var(--line-2);
+  border-radius: var(--r-xl);
+  background-color: var(--surface);
+  color: var(--text);
+  transition: border-color var(--m-base) var(--e-out), box-shadow var(--m-base) var(--e-out);
+}
+:where(select, textarea, input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="hidden"], [type="submit"], [type="button"], [type="reset"], [type="image"])):hover {
+  border-color: color-mix(in srgb, var(--brand) 40%, var(--line-2));
+}
+:where(select, textarea, input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="hidden"], [type="submit"], [type="button"], [type="reset"], [type="image"])):focus-visible {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: var(--ring-focus);
+}
+:where(input, select, textarea)[aria-invalid="true"] { border-color: var(--danger); }
+:where(input, select, textarea)[aria-invalid="true"]:focus-visible { box-shadow: var(--ring-danger); }
+:where(input, select, textarea):disabled { background-color: var(--surface-2); border-color: var(--line); color: var(--text-3); cursor: not-allowed; }
+/* Inputs drawn inside a pill (top-bar searches) keep the pill's own box. */
+:is(.global-search, .role-search, .pilot-search, .local-search, .staff-search, .attention-search) input { min-height: 0; border: 0; box-shadow: none; }
+:is(.global-search, .role-search, .pilot-search, .local-search, .staff-search, .attention-search) input:focus-visible { box-shadow: none; }
+
+.role-management-form input, .role-management-form select, .role-management-form textarea,
+.role-modal input, .role-modal textarea, .role-local-search input,
+:is(.pilot, body) .pilot-field :is(input, select, textarea),
+:is(.pilot, body) .pilot-inline-filter select {
+  border: 1.5px solid var(--line-2);
+  border-radius: var(--r-xl);
+  background: var(--surface);
+  color: var(--text);
+}
+.role-management-form :is(input, select, textarea):focus-visible,
+.role-modal :is(input, textarea):focus-visible,
+.role-local-search input:focus-visible,
+:is(.pilot, body) .pilot-field :is(input, select, textarea):focus-visible,
+:is(.pilot, body) .pilot-inline-filter select:focus-visible {
+  outline: none; border-color: var(--brand); box-shadow: var(--ring-focus);
+}
+.role-management-form label, :is(.pilot, body) .pilot-field span { color: var(--text-2); font-weight: 600; font-size: 12.5px; }
+.form-error, .staff-form-error { color: var(--danger); font-weight: 500; }
+
+/* =====================================================================================
+   CHIPS (pills) — pilot-chip, v2-chip
+   ===================================================================================== */
+.pilot-chip, .v2-chip {
+  min-height: 22px; padding: 2px 10px; border-radius: var(--r-pill);
+  font: 600 11.5px/1.3 var(--font-sans); letter-spacing: .01em;
+}
+.pilot-chip.blue, .pilot-chip.purple, .pilot-chip.indigo, .v2-chip.blue, .v2-chip.purple { background: var(--brand-soft); color: var(--brand-ink); }
+.pilot-chip.teal { background: var(--cyan-soft); color: var(--cyan-ink); }
+.pilot-chip.green, .v2-chip.green { background: var(--ok-soft); color: var(--ok-ink); }
+.pilot-chip.amber, .v2-chip.amber { background: var(--warn-soft); color: var(--warn); }
+.pilot-chip.rose { background: var(--danger-soft); color: var(--danger); }
+.pilot-chip.slate, .v2-chip.slate { background: var(--surface-2); color: var(--text-2); }
+
+/* =====================================================================================
+   STATUS TAGS — 6px slanted fill behind upright text (.tag), plus the older hiring-state and
+   status-pill classes drawn the same way. <StatusTag> sets the approved tone explicitly.
+   ===================================================================================== */
+.tag[class], .hiring-state[class], .status-pill[class] {
+  display: inline-flex; align-items: center; gap: 5px;
+  width: fit-content; min-height: 22px; padding: 0 9px 0 8px;
+  border: 0; border-radius: 0; background: none;
+  font: 600 11.5px/1.2 var(--font-sans); letter-spacing: .01em; white-space: nowrap;
+  position: relative; isolation: isolate;
+  color: var(--text-2);
+}
+.tag::before, .hiring-state::before, .status-pill::before {
+  content: ''; position: absolute; inset: 0; z-index: -1;
+  border-radius: var(--r-sm);
+  transform: skewX(var(--slant));
+  background: var(--tb, var(--muted-soft));
+}
+.tag > i, .hiring-state > i { width: 6px; height: 6px; border-radius: 2px; transform: skewX(var(--slant)); background: currentColor; flex: none; }
+.tag > i.h, .hiring-state > i.h { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
+.tag .tag-icon { width: 12px; height: 12px; margin: 0 -1px; }
+.tag.lg { min-height: 26px; font-size: 12.5px; padding: 0 11px 0 10px; }
+
+/* Doubled with .tag so a tone outranks the older .hiring-state.state-* colours in styles.css. */
+.tag.t-band { --tb: var(--brand-soft); color: var(--brand-ink); }
+.tag.t-cyan { --tb: var(--cyan-soft); color: var(--cyan-ink); }
+.tag.t-hot { --tb: var(--orange-soft); color: var(--orange-ink); }
+.tag.t-gold { --tb: var(--gold-soft); color: var(--gold-ink); }
+.tag.t-ok { --tb: var(--ok-soft); color: var(--ok-ink); }
+.tag.t-warn { --tb: var(--warn-soft); color: var(--warn); }
+.tag.t-danger { --tb: var(--danger-soft); color: var(--danger); }
+.tag.t-mute { --tb: var(--muted-soft); color: var(--text-2); }
+.tag.t-line { --tb: transparent; color: var(--text-2); }
+.tag.t-line::before { box-shadow: inset 0 0 0 1px var(--line-2); }
+
+/* hiring-state without <StatusTag>: the approved stage colours by state class. */
+.hiring-state:not([data-tone]) { --tb: var(--muted-soft); color: var(--text-2); }
+.hiring-state:not([data-tone]):is(.state-applied, .state-screening, .state-shortlisted, .state-assessment, .state-open, .state-scheduled, .state-rescheduled, .state-current) { --tb: var(--brand-soft); color: var(--brand-ink); }
+.hiring-state:not([data-tone]).state-interview { --tb: var(--cyan-soft); color: var(--cyan-ink); }
+.hiring-state:not([data-tone]):is(.state-offer, .state-extended, .state-changes_requested) { --tb: var(--orange-soft); color: var(--orange-ink); }
+.hiring-state:not([data-tone]):is(.state-hired, .state-accepted, .state-published, .state-verified, .state-approved, .state-live, .state-active, .state-completed, .state-succeeded) { --tb: var(--ok-soft); color: var(--ok-ink); }
+.hiring-state:not([data-tone]):is(.state-pending, .state-requested, .state-in_review, .state-under_review, .state-queued, .state-running) { --tb: var(--warn-soft); color: var(--warn); }
+.hiring-state:not([data-tone]):is(.state-failed, .state-refused, .state-suspended) { --tb: var(--danger-soft); color: var(--danger); }
+
+/* StatusBadge (studentComponents): success / warning / info / neutral / danger tones. */
+.status-pill.success { --tb: var(--ok-soft); color: var(--ok-ink); background: none; }
+.status-pill.warning { --tb: var(--warn-soft); color: var(--warn); background: none; }
+.status-pill.info { --tb: var(--brand-soft); color: var(--brand-ink); background: none; }
+.status-pill.neutral { --tb: var(--muted-soft); color: var(--text-2); background: none; }
+.status-pill.danger { --tb: var(--danger-soft); color: var(--danger); background: none; }
+
+/* =====================================================================================
+   CARDS — 18px corners, hairline, card shadow; the slanted gradient tick before a card title
+   ===================================================================================== */
+.pilot-card, .v2-card, .role-card, .card, .role-record-card, .role-page-heading, .role-preview-notice, .demo-role-card {
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.pilot-card, .v2-card { padding: 18px 20px; }
+.pilot-card h2, .v2-card h2, .role-card h2 { font-family: var(--font-display); font-weight: 600; font-size: 16px; letter-spacing: -.02em; color: var(--text); }
+.pilot-card-head > h2, .v2-card-head > h2 { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.pilot-card-head > h2::before, .v2-card-head > h2::before {
+  content: ''; width: 5px; height: 16px; border-radius: 2px; flex: none;
+  background: var(--grad); transform: skewX(var(--slant));
+}
+.role-empty { border: 1.5px dashed var(--line-2); border-radius: var(--r-card); background: transparent; }
+.eyebrow { color: var(--text-3); font: 600 var(--fs-eyebrow) var(--font-sans); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; }
+
+/* List rows inside cards */
+.pilot-list-row, .v2-list-row { border-bottom-color: var(--line); }
+.pilot-list-row strong, .v2-list-row strong { font-weight: 600; }
+
+/* =====================================================================================
+   KPI TILES — pilot-kpi / pilot-stat / v2-stat / role-kpi, with the 38px icon tile
+   ===================================================================================== */
+.pilot-card.pilot-kpi { display: flex; gap: 14px; align-items: flex-start; padding: 16px 18px; border-radius: var(--r-3xl); }
+.pilot-kpi b, .pilot-stat b, .v2-stat b, .role-kpi strong {
+  font-family: var(--font-display); font-weight: 700; letter-spacing: -.02em; line-height: 1.05;
+  font-variant-numeric: tabular-nums; color: var(--text);
+}
+.pilot-kpi b { font-size: var(--fs-kpi); }
+.pilot-kpi small, .pilot-stat small, .v2-stat small { color: var(--text-3); }
+.pilot-kpi[data-na] b, .pilot-stat[data-na] b { color: var(--text-2); }
+.role-kpi { border-left: 0; border-radius: var(--r-3xl); }
+
+.pilot-tile, .v2-tile {
+  width: 38px; height: 38px; border-radius: 11px;
+  background: var(--surface-2); color: var(--brand-ink);
+}
+.pilot-tile:is(.blue, .purple, .indigo, .teal, .slate), .v2-tile:is(.blue, .purple, .teal) { background: var(--brand-soft); color: var(--brand-ink); }
+.pilot-tile.green, .v2-tile.green { background: var(--ok-soft); color: var(--ok-ink); }
+.pilot-tile.amber, .v2-tile.amber { background: var(--warn-soft); color: var(--warn); }
+.pilot-tile.rose { background: var(--danger-soft); color: var(--danger); }
+
+/* =====================================================================================
+   TABS — underline on the slant
+   ===================================================================================== */
+.pilot-tabs { gap: 4px; border-bottom: 1px solid var(--line); }
+:is(.pilot, body) .pilot-tab {
+  position: relative; height: 42px; padding: 0 14px; border: 0; border-radius: 0;
+  font: 600 14px var(--font-sans); color: var(--text-3); background: none;
+}
+:is(.pilot, body) .pilot-tab:hover { color: var(--text); }
+:is(.pilot, body) .pilot-tab.active { color: var(--text); border-bottom-color: transparent; }
+:is(.pilot, body) .pilot-tab.active::after {
+  content: ''; position: absolute; left: 10px; right: 10px; bottom: -1px; height: 3px; border-radius: 2px;
+  background: var(--grad); transform: skewX(var(--slant));
+}
+
+/* =====================================================================================
+   TABLES — uppercase 11px headers, 12px cell rhythm, hover tint
+   ===================================================================================== */
+.role-record-table-wrap, .pilot-table-wrap { border-radius: var(--r-card); }
+.role-record-table thead th, .pilot-table th, .na-count-table thead th, .attention-table th, .department-table th {
+  background: transparent;
+  color: var(--text-3);
+  font: 600 11px var(--font-sans);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--line);
+}
+.role-record-table th, .role-record-table td, .pilot-table td { border-bottom-color: var(--line); }
+.role-record-table tbody tr, .pilot-table tbody tr { transition: background-color var(--m-micro); }
+.role-record-table tbody tr:hover > :is(td, th), .pilot-table tbody tr:hover > td { background: color-mix(in srgb, var(--surface-2) 60%, transparent); }
+.role-record-table td.num, .pilot-table td.num { font-family: var(--font-display); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* =====================================================================================
+   PROGRESS — course and task progress only (never readiness): gradient fill on surface-3
+   ===================================================================================== */
+.pilot-bar, .v2-bar { height: 8px; border-radius: 6px; background: var(--surface-3); }
+.pilot-bar i, .v2-bar i { border-radius: 6px; background: var(--grad); }
+.pilot-bar.green i, .v2-bar.green i { background: var(--ok); }
+.pilot-bar.amber i, .v2-bar.amber i { background: var(--grad-today); }
+.pilot-bar:is(.purple, .indigo) i { background: var(--grad); }
+.pilot-bar.rose i { background: var(--danger); }
+.pilot-bar.thin { height: 5px; }
+.pilot-funnel-row .pilot-bar { height: 14px; border-radius: 6px; }
+.pilot-funnel-row .pilot-bar i { transform: none; }
+.na-count-track i { background: var(--grad); }
+
+/* Legend dots (pilot-legend): neutral swatch, slanted like the Momentum legend */
+.pilot-legend i { border-radius: 2px; transform: skewX(var(--slant)); background: var(--surface-3); }
+.pilot-legend .num { font-family: var(--font-display); font-variant-numeric: tabular-nums; }
+
+/* =====================================================================================
+   BANNERS / NOTICES — inline, 14px corners; tone by fill, text in the fill's ink
+   ===================================================================================== */
+.pilot-banner {
+  border-radius: var(--r-2xl); padding: 11px 16px; gap: 12px;
+  background: var(--ok-soft); color: var(--ok-ink); font-size: 13px;
+}
+.pilot-banner.blue { background: var(--brand-soft); color: var(--brand-ink); }
+.staff-demo-notice {
+  border-radius: var(--r-2xl); padding: 8px 14px; font-size: 12.5px;
+  background: var(--ok-soft); color: var(--ok-ink);
+  border: 1px solid color-mix(in srgb, var(--ok) 25%, transparent);
+}
+.role-preview-notice { border-radius: var(--r-2xl); padding: 11px 16px; color: var(--text-2); font-size: 13px; }
+.role-preview-notice strong, .role-preview-notice b { color: var(--text); }
+.role-api-success { border-radius: var(--r-2xl); background: var(--ok-soft); color: var(--ok-ink); border-color: transparent; }
+.ownership-note { border-radius: var(--r-2xl); background: var(--surface-2); color: var(--text-2); }
+
+/* =====================================================================================
+   TOASTS — the inverse surface, 16px corners
+   ===================================================================================== */
+.staff-toast, :is(.pilot, body) .pilot-toast {
+  background: var(--toast); color: var(--toast-ink);
+  border: 0; border-radius: var(--r-3xl); box-shadow: var(--shadow-toast);
+  font: 600 13.5px var(--font-sans); padding: 12px 18px;
+}
+
+/* =====================================================================================
+   MODAL — 28px corners, the 4px gradient bar on top, pop shadow, calm scrim
+   ===================================================================================== */
+.role-modal, :is(.pilot, body) .pilot-modal, .staff-modal, .student-dialog {
+  position: relative; overflow: hidden;
+  border: 1px solid var(--line); border-radius: var(--r-hero);
+  background: var(--surface); color: var(--text); box-shadow: var(--shadow-pop);
+}
+.role-modal { padding: 28px 30px 24px; }
+.role-modal::before, :is(.pilot, body) .pilot-modal::before, .staff-modal::before, .student-dialog::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 0; height: 4px; background: var(--grad);
+}
+.role-modal h2, :is(.pilot, body) .pilot-modal-head h2, .staff-modal h2, .student-dialog h2 { font: 700 20px/1.2 var(--font-display); letter-spacing: -.025em; }
+.role-modal-backdrop, :is(.pilot, body) .pilot-modal-backdrop, .staff-modal-backdrop, .student-dialog-backdrop {
+  background: color-mix(in srgb, #070A18 46%, transparent);
+}
+.role-modal-actions, .dialog-actions, :is(.pilot, body) .pilot-modal-actions, .staff-modal-actions { gap: 10px; }
+@media (prefers-reduced-motion: no-preference) {
+  .role-modal, .staff-modal, .student-dialog { animation: momentumModalIn var(--m-slow) var(--e-out) both; }
+}
+@keyframes momentumModalIn { from { opacity: 0; translate: 14px 40px; } }
+
+/* =====================================================================================
+   DROPDOWN / MENU — the top-bar notification and message flyouts (the app's only popovers)
+   ===================================================================================== */
+.notify-flyout {
+  border: 1px solid var(--line); border-radius: var(--r-2xl);
+  background: var(--surface); box-shadow: var(--shadow-menu);
+}
+
+/* =====================================================================================
+   AVATARS — gradient initials
+   ===================================================================================== */
+.pilot-avatar, .avatar, .role-avatar { background: var(--grad); color: #FFFFFF; font-family: var(--font-display); font-weight: 700; }
+
+/* =====================================================================================
+   SKELETONS + LOADER — 12° shimmer; chevron loader
+   ===================================================================================== */
+.sk-line, .sk-block { display: block; height: 10px; border-radius: 5px; background: var(--surface-3); position: relative; overflow: hidden; }
+.sk-block { height: 34px; border-radius: 10px; }
+.sk-line::after, .sk-block::after {
+  content: ''; position: absolute; inset: 0; transform: skewX(var(--slant)); translate: -100% 0;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--surface) 75%, transparent), transparent);
+}
+@keyframes momentumSkel { 0% { translate: -120% 0; } 100% { translate: 220% 0; } }
+@media (prefers-reduced-motion: no-preference) {
+  .sk-line::after, .sk-block::after { animation: momentumSkel var(--loop-skeleton) var(--e-inout) infinite; }
+}
+
+/* =====================================================================================
+   SMALL COUNTS — "<5" and the uniform hatched suppressed block (README-institution rule 1)
+   ===================================================================================== */
+.small-count { font-variant-numeric: tabular-nums; }
+.small-count.is-suppressed { color: var(--text-2); font-weight: 600; white-space: nowrap; }
+.sc-chart { display: inline-flex; align-items: center; gap: 8px; }
+.sc-hatch {
+  --c: var(--brand);
+  display: inline-block; flex: none;
+  border-radius: 3px; transform: skewX(var(--slant));
+  background: repeating-linear-gradient(-78deg, color-mix(in srgb, var(--c) 30%, transparent) 0 4px, transparent 4px 8px);
+  outline: 1.5px dashed color-mix(in srgb, var(--c) 70%, transparent);
+  outline-offset: -1.5px;
+}
+/* One fixed size for every suppressed value: never proportional. */
+.sc-hatch--bar { width: 44px; height: 12px; }
+.sc-hatch--step { width: 100%; height: 22px; border-radius: 8px; }
+.sc-hatch--legend { width: 22px; height: 10px; }
+.sc-legend { display: flex; align-items: center; gap: 8px; margin: 10px 0 0; font-size: 12px; color: var(--text-3); }
+/* A suppressed row in a bar list: the hatched block sits where the bar would be. */
+.na-count-track .sc-hatch, .pilot-funnel-row .sc-hatch { vertical-align: middle; }
+.pilot-funnel-row .sc-slot, .na-count-bar .sc-slot { display: flex; align-items: center; height: 14px; }
+
+/* =====================================================================================
+   READINESS BAND — 4 rising slanted steps, "You" lens pin, dashed next climb (components §14)
+   ===================================================================================== */
+.rb-wrap { min-width: 0; }
+.rb { --u: 14px; --g: 10px; --pt: 44px; --po: 38px; position: relative; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--g); align-items: end; padding-top: var(--pt); }
+.rb-s { position: relative; display: flex; flex-direction: column; justify-content: flex-end; min-width: 0; }
+.rb-bar { position: relative; height: calc(var(--u) * (var(--i) + 1.2)); transform: skewX(var(--slant)); border-radius: 8px; }
+.rb-bar > i { position: absolute; inset: 0; border-radius: inherit; transition: opacity var(--m-base) var(--e-out); }
+.rb-base { background: var(--todo); }
+.rb-done { background: var(--c); opacity: 0; }
+.rb-cur { background: linear-gradient(180deg, color-mix(in srgb, var(--c) 70%, #18C8E8), var(--c)); box-shadow: 0 10px 24px -10px var(--c); opacity: 0; }
+.rb-next { opacity: 0; outline: 2px dashed color-mix(in srgb, var(--brand) 70%, transparent); outline-offset: -2px; overflow: hidden; }
+.rb-next::before { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(-78deg, color-mix(in srgb, var(--brand) 14%, transparent) 0 6px, transparent 6px 11px); }
+.rb-s.done .rb-done, .rb-s.cur .rb-cur, .rb-s.next .rb-next { opacity: 1; }
+.rb-s.next .rb-base, .rb-s.cur .rb-base { opacity: 0; }
+.rb-l { min-height: 32px; margin-top: 10px; font: 500 12px/1.25 var(--font-sans); color: var(--text-3); overflow-wrap: anywhere; }
+.rb-s.cur .rb-l { color: var(--text); font-weight: 700; }
+.rb-s.done .rb-l { color: var(--text-2); }
+.rb-s.next .rb-l { color: var(--brand-ink); font-weight: 600; }
+.rb-pin {
+  position: absolute; z-index: 4;
+  left: calc((var(--cur) - .5) * (100% - 3 * var(--g)) / 4 + (var(--cur) - 1) * var(--g));
+  top: calc(var(--pt) + var(--u) * (4 - var(--cur)) - var(--po));
+  translate: -50% 0;
+}
+.rb-hop { position: relative; display: flex; align-items: center; gap: 6px; padding: 4px 10px 4px 5px; border-radius: 999px; background: var(--text); color: var(--bg); font: 700 11.5px var(--font-sans); white-space: nowrap; box-shadow: 0 6px 14px -6px rgb(0 0 0 / .4); }
+.rb-hop::after { content: ''; position: absolute; left: 50%; bottom: -4px; width: 8px; height: 8px; background: inherit; transform: translateX(-50%) rotate(45deg); border-radius: 1px; }
+.rb-hop .lens, .rb-wrap .lens { width: 16px; height: 16px; border-radius: 50%; background: var(--grad-lens); box-shadow: 0 0 0 2px rgb(255 255 255 / .85); display: inline-block; flex: none; }
+.rb-nx {
+  position: absolute; z-index: 3;
+  left: calc((var(--cur) + .5) * (100% - 3 * var(--g)) / 4 + var(--cur) * var(--g));
+  top: calc(var(--pt) + var(--u) * (3 - var(--cur)) - 24px);
+  translate: -50% 0; font: 700 11px var(--font-sans); color: var(--brand-ink); white-space: nowrap; letter-spacing: .02em;
+}
+.rb.compact { --u: 9px; --pt: 36px; --g: 7px; --po: 36px; }
+.rb.compact .rb-l { font-size: 11px; min-height: 28px; }
+.rb.is-empty .rb-s .rb-base { opacity: 1; }
+.rb-empty { margin: 8px 0 0; font-size: 13px; font-weight: 600; color: var(--text-2); }
+/* On the gradient hero */
+.rb.on-grad .rb-base { background: rgb(255 255 255 / .16); }
+.rb.on-grad .rb-done { background: rgb(255 255 255 / .55); }
+.rb.on-grad .rb-cur { background: #FFFFFF; box-shadow: 0 12px 30px -8px rgb(5 10 40 / .55); }
+.rb.on-grad .rb-next { outline-color: rgb(255 255 255 / .85); }
+.rb.on-grad .rb-next::before { background: repeating-linear-gradient(-78deg, rgb(255 255 255 / .22) 0 6px, transparent 6px 11px); }
+.rb.on-grad .rb-l { color: rgb(255 255 255 / .78); }
+.rb.on-grad .rb-s.cur .rb-l, .rb.on-grad .rb-s.next .rb-l, .rb.on-grad .rb-nx { color: #FFFFFF; }
+.rb.on-grad .rb-hop { background: #0A1030; color: #FFFFFF; }
+/* The privacy line: always shown with the band */
+.rb-privacy { display: flex; align-items: center; gap: 8px; margin: 12px 0 0; font-size: 12.5px; color: var(--text-3); }
+.rb-privacy .one-icon, .rb-privacy svg { color: var(--brand-ink); flex: none; width: 14px; height: 14px; }
+.rb-privacy.on-grad { color: rgb(255 255 255 / .88); }
+.rb-privacy.on-grad svg { color: #FFFFFF; }
+/* Mini band: four slanted bars + band chip + the lock that carries the privacy line */
+.mband { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.mb { display: inline-flex; gap: 3px; align-items: flex-end; }
+.mb i { width: 9px; border-radius: 2px; transform: skewX(var(--slant)); background: var(--surface-3); }
+.mb i:nth-child(1) { height: 7px; } .mb i:nth-child(2) { height: 10px; } .mb i:nth-child(3) { height: 13px; } .mb i:nth-child(4) { height: 16px; }
+.mb i.f { background: var(--brand); opacity: .55; }
+.mb i.c { opacity: 1; }
+.rb-mini-lock { display: inline-flex; color: var(--text-3); }
+.rb-mini-lock svg { width: 13px; height: 13px; }
+@keyframes rbStripes { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+/* The climb's loops start once the marker has landed (`.live`); the current step's glow is an
+   opacity layer in styles/motion.css, with the rest of the climb. */
+@media (prefers-reduced-motion: no-preference) {
+  .rb.live .rb-s.next .rb-next::before { animation: rbStripes var(--loop-breathe) ease-in-out infinite; }
+}
+
+/* The lesson the learning page was opened on ("Resume lesson", approved 2026-10-11): the same
+   lesson card, set first and marked with the brand edge so it reads as where you left off. */
+.career-api-opened {
+  position: relative;
+  margin: 0 0 14px;
+  padding: 18px 20px 16px;
+  border: 1px solid var(--brand);
+  border-radius: var(--r-2xl);
+  background: var(--surface);
+  box-shadow: var(--shadow, none);
+  scroll-margin-top: 96px;
+}
+.career-api-opened:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+.career-api-opened > span { color: var(--brand-ink); font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.career-api-opened h3 { margin: 6px 0; color: var(--text); font: 700 18px/1.3 var(--font-display); }
+.career-api-opened p { color: var(--text-2); }
+.career-api-opened small { display: block; margin: 8px 0; color: var(--text-3); }
+.career-api-opened button { margin-top: 8px; }

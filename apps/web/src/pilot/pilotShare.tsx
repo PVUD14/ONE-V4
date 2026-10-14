@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import qrcode from 'qrcode-generator';
-import { Bell, Camera, CheckCircle2, Copy, Download, EyeOff, Link2, X } from 'lucide-react';
+import { Icon } from '../icons/Icon.js';
 import { DetailRows, downloadCsv, useOverlay, type ModalState } from './pilotOverlay.js';
 import { usePilotSession } from './pilotSession.js';
 import { pilotPersona } from './pilotData.js';
@@ -33,7 +33,7 @@ export function QrSvg({ value, size = 176 }: { readonly value: string; readonly 
   </svg>;
 }
 
-const PUBLIC_URL = 'https://one.ai8ht.pro/p/arjun-reddy';
+const PUBLIC_URL = 'https://oneby8.com/p/arjun-reddy';
 
 export function shareProfileModal(): ModalState {
   return {
@@ -67,21 +67,21 @@ function ShareProfileBody(): React.ReactElement {
       <div style={{ minWidth: 0, flex: 1 }}>
         <span className="pilot-chip green" style={{ marginBottom: 8 }}>Public link enabled</span>
         <p className="pilot-modal-text" style={{ margin: '8px 0' }}>Anyone who scans this code or opens the link sees {pilotPersona.firstName}&apos;s public profile - and nothing else.</p>
-        <div className="pilot-share-link"><Link2 size={13} /> <span>one.ai8ht.pro/p/arjun-reddy</span></div>
+        <div className="pilot-share-link"><Icon name="link" size={16} /> <span>oneby8.com/p/arjun-reddy</span></div>
       </div>
     </div>
     <div style={{ margin: '14px 0 4px' }}>
       <strong style={{ fontSize: 12.5, display: 'block', marginBottom: 7 }}>Visible on the public profile</strong>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         {['Name & photo', 'Institution (verified)', 'Education', 'Projects', 'Certificates', 'Skills'].map((item) => (
-          <span key={item} className="pilot-chip blue"><CheckCircle2 size={11} /> {item}</span>
+          <span key={item} className="pilot-chip blue"><Icon name="check" size={16} /> {item}</span>
         ))}
-        <span className="pilot-chip slate"><EyeOff size={11} /> Readiness scores — never public</span>
+        <span className="pilot-chip slate"><Icon name="eye-off" size={16} /> Readiness band — never public</span>
       </div>
     </div>
     <div className="pilot-modal-actions">
-      <button type="button" className="pilot-btn ghost" onClick={(event) => { event.stopPropagation(); downloadQr(); }}><Download size={14} /> Download QR</button>
-      <button type="button" className="pilot-btn" onClick={(event) => { event.stopPropagation(); copyLink(); }}><Copy size={14} /> Copy Link</button>
+      <button type="button" className="pilot-btn ghost" onClick={(event) => { event.stopPropagation(); downloadQr(); }}><Icon name="download" size={16} /> Download QR</button>
+      <button type="button" className="pilot-btn" onClick={(event) => { event.stopPropagation(); copyLink(); }}><Icon name="copy" size={16} /> Copy Link</button>
     </div>
   </div>;
 }
@@ -103,7 +103,7 @@ export function PhotoUploadControl({ compact }: { readonly compact?: boolean }):
     <input ref={inputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onPick} />
     <button type="button" className={`pilot-btn ${compact ? 'ghost small' : 'ghost'}`}
       onClick={(event) => { event.stopPropagation(); inputRef.current?.click(); }}>
-      <Camera size={14} /> {session.profilePhotoUrl ? 'Change Photo' : 'Upload Photo'}
+      <Icon name="upload" size={16} /> {session.profilePhotoUrl ? 'Change Photo' : 'Upload Photo'}
     </button>
   </>;
 }
@@ -134,10 +134,10 @@ export function NotificationsBody(): React.ReactElement {
     <div className="pilot-list">
       {session.notifications.map((entry) => (
         <div key={entry.id} className="pilot-list-row" style={{ alignItems: 'flex-start', opacity: entry.read ? 0.55 : 1 }}>
-          <span className="pilot-tile amber"><Bell size={15} /></span>
+          <span className="pilot-tile amber"><Icon name="bell" size={16} /></span>
           <div className="grow"><strong style={{ fontWeight: entry.read ? 500 : 650, fontSize: 12.5 }}>{entry.text}</strong><small>{entry.when}</small></div>
           <button type="button" className="pilot-icon-button" style={{ width: 28, height: 28 }} aria-label={`Dismiss notification: ${entry.text}`}
-            onClick={(event) => { event.stopPropagation(); session.dismissNotification(entry.id); }}><X size={13} /></button>
+            onClick={(event) => { event.stopPropagation(); session.dismissNotification(entry.id); }}><Icon name="close" size={16} /></button>
         </div>
       ))}
     </div>
@@ -165,12 +165,12 @@ export function ReportFormatBody({ filenameBase, title, rows }: {
     if (!printable) { overlay.toast('Allow pop-ups to print the PDF.'); return; }
     const bodyRows = rows.map((row) => `<tr>${row.map((cell) => `<td>${cell.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</td>`).join('')}</tr>`).join('');
     printable.document.write(`<!doctype html><title>${title}</title><style>
-      body { font-family: Inter, "Segoe UI", sans-serif; color: #101828; padding: 32px; }
+      body { font-family: "DM Sans", "Segoe UI", sans-serif; color: #101828; padding: 32px; }
       h1 { font-size: 20px; margin: 0 0 4px; } p { color: #5d6b82; margin: 0 0 18px; font-size: 12px; }
       table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
       td { border-bottom: 1px solid #e5eaf2; padding: 8px 10px; text-align: left; }
       tr:first-child td { font-weight: 700; }
-    </style><h1>${title}</h1><p>ONE by Ai8ht · sample data · use your browser's dialog to save as PDF</p><table>${bodyRows}</table>`);
+    </style><h1>${title}</h1><p>ONE by AI8HT · sample data · use your browser's dialog to save as PDF</p><table>${bodyRows}</table>`);
     printable.document.close();
     printable.focus();
     printable.print();
@@ -179,9 +179,9 @@ export function ReportFormatBody({ filenameBase, title, rows }: {
   return <div>
     <p className="pilot-modal-text">Choose the format for <strong>{title}</strong>.</p>
     <div className="pilot-modal-actions" style={{ justifyContent: 'flex-start' }}>
-      <button type="button" className="pilot-btn ghost" onClick={(event) => { event.stopPropagation(); asCsv('csv'); }}><Download size={14} /> CSV</button>
-      <button type="button" className="pilot-btn ghost" onClick={(event) => { event.stopPropagation(); asCsv('xls'); }}><Download size={14} /> Excel</button>
-      <button type="button" className="pilot-btn" onClick={(event) => { event.stopPropagation(); asPdf(); }}><Download size={14} /> PDF (print)</button>
+      <button type="button" className="pilot-btn ghost" onClick={(event) => { event.stopPropagation(); asCsv('csv'); }}><Icon name="download" size={16} /> CSV</button>
+      <button type="button" className="pilot-btn ghost" onClick={(event) => { event.stopPropagation(); asCsv('xls'); }}><Icon name="download" size={16} /> Excel</button>
+      <button type="button" className="pilot-btn" onClick={(event) => { event.stopPropagation(); asPdf(); }}><Icon name="download" size={16} /> PDF (print)</button>
     </div>
   </div>;
 }

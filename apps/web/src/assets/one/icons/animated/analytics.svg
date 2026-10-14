@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-analytics ai-loop" role="img" aria-label="Analytics (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiRise{0%,22%,100%{transform:none}4%{transform:scaleY(.05)}15%{transform:scaleY(1.08)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-area{animation:aiRise 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:0px 21.4px}
+}
+</style>
+<path class="f " fill-rule="evenodd" d="M3.17 14.94Q3.75 15.49 4.3 14.9L7.97 10.96Q8.52 10.38 9.14 10.88L12.26 13.44Q12.88 13.94 13.45 13.38L21.54 5.49Q22.11 4.93 21.55 4.36L20.85 3.64Q20.29 3.07 19.72 3.63L13.3 9.9Q12.72 10.46 12.1 9.95L8.9 7.33Q8.28 6.82 7.73 7.41L2.4 13.13Q1.85 13.71 2.43 14.26Z"/><g class="s"><path class="f p-area" fill-rule="evenodd" d="M2.6 20.2Q2.6 19 3.42 18.12L7.51 13.75Q8.4 12.8 9.41 13.62L11.79 15.58Q12.8 16.4 13.74 15.5L20.46 9.1Q21.4 8.2 21.4 9.5L21.4 20.1Q21.4 21.4 20.1 21.4L3.8 21.4Q2.6 21.4 2.6 20.2Z"/></g>
+</svg>

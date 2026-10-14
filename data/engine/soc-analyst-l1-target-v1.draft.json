@@ -1,0 +1,252 @@
+{
+  "notice": "DRAFT — model-produced content (program Part B.8). Written by the coding agent under ENG-11, by hand from the cited public sources, with no model call made by the product. Import only as DRAFT with AGENT_DRAFTED provenance through db:import:career-target-draft; never publish without a second person reviewing it and a publish approval. Every skill and requirement cites the performance criteria it rests on and lists what a subject expert must check. Targets and levels are our proposal, not figures from the sources. Not shown on any student screen. Rationale for every choice: docs/career-readiness/soc-analyst-l1-target-v1.md.",
+  "packKey": "soc-analyst-l1-target-v1",
+  "roleCatalogueCode": "C01",
+  "generatorVersion": "claude-opus-5-5",
+  "promptVersion": "eng-11-soc-analyst-l1-target-v1",
+  "generatedAt": "2026-09-26T00:00:00.000Z",
+  "sourceBasis": "Primary: NQR qualification file 'Analyst Security Operations Centre', IT-ITeS Sector Skills Council NASSCOM, NSQF level 5, NQR code QG-05-IT-01540-2023-V1.1-NASSCOM (QP SSC/Q0909, version 3; NSQC approval 25 Nov 2021), NOS SSC/N0906 and SSC/N0907, https://www.nqr.gov.in/qualification/file/SSC%20Q0909_Analyst%20Security%20Operations%20Centre_V3.pdf. Cross-checked: NQR OEM file 'Cybersecurity Analysis-IBM' (NG-05-IT-02239-2024-V1-NASSCOM); NIST NICE Framework work role Defensive Cybersecurity (PD-WRL-001); ONE job-role catalogue row C01. Levels, targets and evidence types are the agent's proposal for subject-expert review.",
+  "skills": [
+    {
+      "stableKey": "soc-networking-fundamentals",
+      "name": "Networking fundamentals for security monitoring",
+      "description": "TCP/IP, UDP, DNS, DHCP, HTTP and common ports; how traffic between hosts looks in logs and captures.",
+      "prerequisites": [],
+      "basis": "Q0909 Evidence of Level: 'Relevant networking concepts, devices, and terminology'; Tools annexure lists network protocols TCP/IP, UDP, DNS, DHCP, IPSEC, HTTP. Catalogue C01 core skill area 'Networking'.",
+      "expertCheck": "Check the protocol list is the right depth for L1 (IPSEC may be beyond entry level) and whether subnetting belongs here or in a separate skill."
+    },
+    {
+      "stableKey": "soc-os-log-sources",
+      "name": "Windows and Linux log sources",
+      "description": "Where operating systems and applications record security-relevant events (for example Windows event logs, Linux system and authentication logs) and how to collect them.",
+      "prerequisites": ["soc-networking-fundamentals"],
+      "basis": "SSC/N0906 PC8 'collect logs from all types of ICT systems devices and applications as required by the organisation'. Catalogue C01 core skill area 'Linux and Windows logs'.",
+      "expertCheck": "Check that naming Windows and Linux (and not macOS, network devices or cloud logs) is the right L1 scope; the qualification says 'all types of ICT systems'."
+    },
+    {
+      "stableKey": "soc-security-fundamentals",
+      "name": "Security fundamentals and common attacks",
+      "description": "Core security concepts, defence in depth, and the common vulnerability and attack types an analyst must recognise.",
+      "prerequisites": [],
+      "basis": "Q0909 Evidence of Level: 'Basic cyber security concepts', 'Knowledge of defence-in-depth principles'; SSC/N0907 PC15 'identify and categorize types of vulnerabilities and associated attacks'.",
+      "expertCheck": "Check the boundary with soc-vulnerability-basics so the two do not measure the same thing twice."
+    },
+    {
+      "stableKey": "soc-security-monitoring-siem",
+      "name": "Security monitoring with a SIEM",
+      "description": "Monitoring traffic and logs with security tools, collecting alert data through a SIEM, and spotting trends and patterns.",
+      "prerequisites": ["soc-os-log-sources", "soc-networking-fundamentals"],
+      "basis": "SSC/N0906 PC2, PC3 (monitor traffic and logs to detect threats), PC9 (collect data on alerts through SIEM), PC11 (identify trends and patterns using SIEM); N0907 PC24 (integrate assets with the SIEM). Tools annexure names SIEM tools.",
+      "expertCheck": "Check that the skill is assessable tool-neutrally (the qualification names several commercial SIEMs); ONE should not require a specific vendor."
+    },
+    {
+      "stableKey": "soc-alert-triage",
+      "name": "Alert triage and prioritisation",
+      "description": "Receiving alerts, working out their likely cause, separating real incidents from benign activity, and prioritising by potential impact.",
+      "prerequisites": ["soc-security-monitoring-siem", "soc-security-fundamentals"],
+      "basis": "SSC/N0907 PC1 (receive and analyse alarms and alerts, determine possible causes), PC6 (distinguish incidents from benign activities), PC10 (incident triage: scope, urgency, potential impact); SSC/N0906 PC15 (categorise priority of risks by potential impact). NICE PD-WRL-001 describes analysing data from defence tools to mitigate threats. Catalogue C01 'SIEM alert triage'.",
+      "expertCheck": "Check that triage is the right single skill or should split into 'identify false positives' and 'prioritise'; check whether scenario questions can evidence it before labs exist."
+    },
+    {
+      "stableKey": "soc-log-analysis-correlation",
+      "name": "Log analysis and event correlation",
+      "description": "Reading logs from several sources, correlating events, and drawing a conclusion about what happened and how serious it is.",
+      "prerequisites": ["soc-os-log-sources", "soc-security-monitoring-siem"],
+      "basis": "SSC/N0906 PC13 (event correlation for situational awareness), PC14 (analysis of logs for identifying risks); SSC/N0907 PC2 (incorporate data from multiple tools), PC9 (analyse log files from a variety of sources), PC11 and PC12 (correlate data; correlate events using a SIEM).",
+      "expertCheck": "Check overlap with soc-security-monitoring-siem; the qualification spreads correlation across both NOS."
+    },
+    {
+      "stableKey": "soc-network-traffic-analysis",
+      "name": "Network traffic and packet analysis",
+      "description": "Characterising network traffic, using packet analysis to validate intrusion-detection alerts, and recognising denial-of-service patterns.",
+      "prerequisites": ["soc-networking-fundamentals"],
+      "basis": "SSC/N0906 PC10 (characterise and analyse network traffic for anomalous activity); SSC/N0907 PC3 (validate IDS/IPS alerts using packet analysis tools), PC4 (deep packet analysis for DDoS/DoS vectors). Tools annexure names traffic analysis tools such as Wireshark.",
+      "expertCheck": "Check whether deep packet analysis is expected at L1 on entry or learned on the job; this is why it is proposed as IMPORTANT, not ESSENTIAL."
+    },
+    {
+      "stableKey": "soc-incident-response-process",
+      "name": "Incident response process and escalation",
+      "description": "The incident-handling lifecycle as an L1 analyst lives it: scoping, preserving evidence, recommending actions, escalating what cannot be resolved, and closing incidents by procedure.",
+      "prerequisites": ["soc-alert-triage"],
+      "basis": "Q0909 Evidence of Level: 'Knowledge of incident response and handling methodologies'; SSC/N0907 PC5, PC7, PC13 (preserve evidence), PC16, PC17 (course of action, recommendations), PC20, PC21 (escalate; close incidents by procedure); SSC/N0906 PC20, PC26 (seek specialist help; use the escalation matrix). Catalogue C01 'incident response'.",
+      "expertCheck": "Check that an L1 is expected to recommend responses (PC17) and not only escalate; employer practice may differ."
+    },
+    {
+      "stableKey": "soc-attack-frameworks-mitre",
+      "name": "Mapping activity to MITRE ATT&CK",
+      "description": "Describing observed adversary behaviour in ATT&CK tactics and techniques so that findings are consistent and comparable.",
+      "prerequisites": ["soc-security-fundamentals"],
+      "basis": "Catalogue C01 core skill area 'MITRE ATT&CK'; Q0909 Tools annexure lists MITRE ATT&CK among 'Security Methodologies and Vulnerability Frameworks'; SSC/N0907 PC8 (determine exploitation methods and effects).",
+      "expertCheck": "The qualification lists ATT&CK as a tool rather than a performance criterion. Check whether it is expected of an L1 on entry."
+    },
+    {
+      "stableKey": "soc-ticketing-and-reporting",
+      "name": "Ticketing, documentation and shift handover",
+      "description": "Recording and categorising tickets accurately, assigning them, documenting monitoring and incident work in the standard format, and giving and receiving shift handover.",
+      "prerequisites": [],
+      "basis": "SSC/N0906 PC16 to PC19 (record, raise, assign and prioritise tickets), PC21 (report results using standard documentation), PC22, PC23 (24/7 shift schedule; shift handover), PC25 (maintain a knowledge base); SSC/N0907 PC22, PC23 (report incident management; track incidents to resolution). Catalogue C01 'reporting'.",
+      "expertCheck": "Check the boundary with the existing professional-communication topic, which covers written handover in general terms."
+    },
+    {
+      "stableKey": "soc-threat-intel-sources",
+      "name": "Using external threat information",
+      "description": "Following external sources such as CERT advisories and vendor bulletins, and using them during an investigation.",
+      "prerequisites": ["soc-security-fundamentals"],
+      "basis": "SSC/N0906 PC4 (monitor external data sources, e.g. CND vendor sites, Computer Emergency Response Teams, SANS, Security Focus); SSC/N0907 PC19 (use external information sources for incident investigation).",
+      "expertCheck": "Check whether CERT-In advisories should be named explicitly for Indian employers; the qualification names sources generically."
+    },
+    {
+      "stableKey": "soc-vulnerability-basics",
+      "name": "Vulnerability scanning basics",
+      "description": "What a vulnerability scan does, how to read its findings, and how vulnerabilities relate to the alerts an analyst sees.",
+      "prerequisites": ["soc-security-fundamentals"],
+      "basis": "Q0909 Evidence of Level: 'how to conduct vulnerability scans and recognizing vulnerabilities in security systems', 'the security vulnerabilities associated with remote access technologies'.",
+      "expertCheck": "Check whether this belongs to C01 at all or mainly to C02 (VAPT associate); proposed as HELPFUL for that reason."
+    },
+    {
+      "stableKey": "soc-policy-and-compliance-basics",
+      "name": "Security policy, standards and legal compliance basics",
+      "description": "Awareness of the frameworks and standards SOC work operates under (for example NIST, ISO/IEC 27001, ITIL) and of complying with relevant legislation and organisational policy.",
+      "prerequisites": [],
+      "basis": "SSC/N0906 PC24 (comply with relevant legislation, standards, policies and procedures); Q0909 Evidence of Level: 'frameworks and management system standards like NIST, ITIL, ISO IEC 20000, ISO 27001'.",
+      "expertCheck": "Check whether Indian legislation (IT Act 2000, CERT-In reporting directions, DPDP Act 2023) should be named; the qualification does not name any."
+    }
+  ],
+  "requirements": [
+    {
+      "topic": "soc-alert-triage",
+      "level": "ESSENTIAL",
+      "targetMastery": 0.7,
+      "rationale": "Triage is the core of the L1 job: most of NOS SSC/N0907 is receiving alerts, separating real incidents from benign activity and judging urgency.",
+      "requiredEvidenceTypes": ["ASSESSMENT_OUTCOME"],
+      "basis": "SSC/N0907 PC1, PC6, PC10; SSC/N0906 PC15.",
+      "expertCheck": "Target 0.70 mirrors the qualification's 70% minimum aggregate pass; a pass mark is not a mastery ratio, so confirm or change it."
+    },
+    {
+      "topic": "soc-log-analysis-correlation",
+      "level": "ESSENTIAL",
+      "targetMastery": 0.7,
+      "rationale": "Both mandatory NOS require analysing logs from several sources and correlating events before deciding whether something is a threat.",
+      "requiredEvidenceTypes": ["ASSESSMENT_OUTCOME"],
+      "basis": "SSC/N0906 PC13, PC14; SSC/N0907 PC2, PC9, PC11, PC12.",
+      "expertCheck": "Confirm the level and the 0.70 target."
+    },
+    {
+      "topic": "soc-security-monitoring-siem",
+      "level": "ESSENTIAL",
+      "targetMastery": 0.7,
+      "rationale": "NOS SSC/N0906 is monitoring and logging events; alert data reaches an L1 analyst through a SIEM.",
+      "requiredEvidenceTypes": ["ASSESSMENT_OUTCOME"],
+      "basis": "SSC/N0906 PC2, PC3, PC9, PC11; SSC/N0907 PC24.",
+      "expertCheck": "Confirm the level; confirm it can be evidenced without a specific vendor's SIEM."
+    },
+    {
+      "topic": "soc-os-log-sources",
+      "level": "ESSENTIAL",
+      "targetMastery": 0.65,
+      "rationale": "An analyst cannot read an alert without knowing which system wrote the log behind it; the catalogue names Linux and Windows logs for this role.",
+      "requiredEvidenceTypes": ["ASSESSMENT_OUTCOME"],
+      "basis": "SSC/N0906 PC8; catalogue C01 core skill areas.",
+      "expertCheck": "0.65 is set a little below the analysis skills that build on it; confirm."
+    },
+    {
+      "topic": "soc-networking-fundamentals",
+      "level": "ESSENTIAL",
+      "targetMastery": 0.65,
+      "rationale": "Networking concepts are named in the qualification's level justification and underpin traffic analysis, monitoring and triage.",
+      "requiredEvidenceTypes": ["ASSESSMENT_OUTCOME"],
+      "basis": "Q0909 Evidence of Level; Tools annexure (network protocols); catalogue C01.",
+      "expertCheck": "Confirm ESSENTIAL rather than a prerequisite assumed from the degree (the qualification's entry requirement is UG or diploma study in engineering or science)."
+    },
+    {
+      "topic": "soc-incident-response-process",
+      "level": "ESSENTIAL",
+      "targetMastery": 0.65,
+      "rationale": "An L1 analyst must preserve evidence, recommend actions and escalate what they cannot resolve, following the incident procedure.",
+      "requiredEvidenceTypes": ["ASSESSMENT_OUTCOME"],
+      "basis": "SSC/N0907 PC5, PC7, PC13, PC16, PC17, PC20, PC21; SSC/N0906 PC20, PC26; Q0909 Evidence of Level.",
+      "expertCheck": "Confirm the level and whether 0.65 is right for a process skill mostly learned on the job."
+    },
+    {
+      "topic": "soc-ticketing-and-reporting",
+      "level": "ESSENTIAL",
+      "targetMastery": 0.65,
+      "rationale": "Ticketing, standard documentation and shift handover run through a large share of NOS SSC/N0906's performance criteria.",
+      "requiredEvidenceTypes": ["ASSESSMENT_OUTCOME"],
+      "basis": "SSC/N0906 PC16 to PC19, PC21 to PC23, PC25; SSC/N0907 PC22, PC23.",
+      "expertCheck": "Confirm ESSENTIAL; check overlap with professional-communication."
+    },
+    {
+      "topic": "soc-security-fundamentals",
+      "level": "ESSENTIAL",
+      "targetMastery": 0.65,
+      "rationale": "Basic security concepts and recognising common attack and vulnerability types are the knowledge every other skill here relies on.",
+      "requiredEvidenceTypes": ["ASSESSMENT_OUTCOME"],
+      "basis": "Q0909 Evidence of Level; SSC/N0907 PC15.",
+      "expertCheck": "Confirm the level and target."
+    },
+    {
+      "topic": "soc-network-traffic-analysis",
+      "level": "IMPORTANT",
+      "targetMastery": 0.6,
+      "rationale": "Validating intrusion-detection alerts against traffic is in the qualification, but deep packet analysis is proposed as important rather than essential for a first SOC job.",
+      "requiredEvidenceTypes": ["ASSESSMENT_OUTCOME"],
+      "basis": "SSC/N0906 PC10; SSC/N0907 PC3, PC4.",
+      "expertCheck": "The level is our judgement; the qualification does not grade criteria by importance."
+    },
+    {
+      "topic": "soc-attack-frameworks-mitre",
+      "level": "IMPORTANT",
+      "targetMastery": 0.55,
+      "rationale": "The catalogue names MITRE ATT&CK for this role and the qualification lists it among the frameworks used; describing activity consistently makes escalations useful.",
+      "requiredEvidenceTypes": ["ASSESSMENT_OUTCOME"],
+      "basis": "Catalogue C01; Q0909 Tools annexure; SSC/N0907 PC8.",
+      "expertCheck": "Confirm whether ATT&CK is expected on entry."
+    },
+    {
+      "topic": "soc-threat-intel-sources",
+      "level": "HELPFUL",
+      "targetMastery": 0.5,
+      "rationale": "Using external advisories is in both NOS but is a smaller part of the L1 job than triage and analysis.",
+      "requiredEvidenceTypes": ["ASSESSMENT_OUTCOME"],
+      "basis": "SSC/N0906 PC4; SSC/N0907 PC19.",
+      "expertCheck": "Confirm the level."
+    },
+    {
+      "topic": "soc-vulnerability-basics",
+      "level": "HELPFUL",
+      "targetMastery": 0.5,
+      "rationale": "Named in the qualification's level justification, but vulnerability assessment is the main work of a different catalogue role (C02).",
+      "requiredEvidenceTypes": ["ASSESSMENT_OUTCOME"],
+      "basis": "Q0909 Evidence of Level.",
+      "expertCheck": "Confirm it belongs in C01 at all."
+    },
+    {
+      "topic": "soc-policy-and-compliance-basics",
+      "level": "HELPFUL",
+      "targetMastery": 0.5,
+      "rationale": "An analyst works within security standards and must comply with legislation and policy, but is not the person who writes or audits them.",
+      "requiredEvidenceTypes": ["ASSESSMENT_OUTCOME"],
+      "basis": "SSC/N0906 PC24; Q0909 Evidence of Level.",
+      "expertCheck": "Confirm the level; decide whether Indian legislation should be named in the skill."
+    },
+    {
+      "topic": "professional-communication",
+      "level": "ESSENTIAL",
+      "targetMastery": 0.75,
+      "rationale": "Incident handover and escalation notes are read by people acting on them under pressure.",
+      "requiredEvidenceTypes": [],
+      "basis": "Carried unchanged from the live starter requirement (data/careers/starter-v1.json) so that publishing this set does not silently change today's gaps.",
+      "expertCheck": "Keep, change or remove: this requirement predates the qualification alignment."
+    },
+    {
+      "topic": "interview-foundations",
+      "level": "IMPORTANT",
+      "targetMastery": 0.6,
+      "rationale": "Security interviews probe reasoning aloud through scenario questions.",
+      "requiredEvidenceTypes": [],
+      "basis": "Carried unchanged from the live starter requirement (data/careers/starter-v1.json) so that publishing this set does not silently change today's gaps.",
+      "expertCheck": "Keep, change or remove: interviewing is not in the qualification, and it is a job-search skill rather than a job skill."
+    }
+  ]
+}

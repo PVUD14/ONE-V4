@@ -1,8 +1,9 @@
 {
-	email ops@one.ai8ht.pro
+	# Let's Encrypt sends certificate-expiry notices here.
+	email info@ai8ht.pro
 }
 
-one.ai8ht.pro {
+oneby8.com {
 	encode zstd gzip
 
 	header {
@@ -24,4 +25,54 @@ one.ai8ht.pro {
 	handle {
 		reverse_proxy web:8080
 	}
+}
+
+# The sandbox (ADR-046, docs/ops/runbook-demo-site.md): the real application over its own
+# database of fictional sample data, served by api-demo and web-sandbox. It gets the same
+# security headers as oneby8.com and is kept out of search engines. Nothing here can
+# reach the production API or database: those containers are on another network.
+demo.oneby8.com {
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+		X-Frame-Options DENY
+		X-Robots-Tag "noindex, nofollow"
+		-Server
+	}
+
+	# Outer lock: only the people Divakar lists may open the sandbox at all - every page,
+	# every API call. The list lives on the server, in deploy/vps/demo-access/users.caddy
+	# (one "username bcrypt-hash" per line; any *.caddy file there counts), never in the
+	# repository. With no file the sandbox stays locked to everyone, and oneby8.com keeps
+	# running. Inside, each person still signs in to a demo account (the sandbox's own
+	# Cognito pool), which decides the one workspace they see.
+	basic_auth {
+		import /etc/caddy/demo-access/*.caddy
+	}
+
+	# The browser keeps sending this lock's credentials in the Authorization header, so the
+	# sandbox build of the web app sends its sign-in token as X-One-Authorization instead
+	# (apps/web/src/api/http.ts). Here it becomes the API's Authorization header again, and
+	# the lock's credentials never reach the API.
+	@api path /api/* /health
+	handle @api {
+		reverse_proxy api-demo:3000 {
+			header_up Authorization {http.request.header.X-One-Authorization}
+			header_up -X-One-Authorization
+		}
+	}
+
+	handle {
+		reverse_proxy web-sandbox:8080
+	}
+}
+
+# One address only: www and the retired one.ai8ht.pro forward permanently to
+# oneby8.com, keeping the path so old links and shared profile URLs still land.
+# one.ai8ht.pro gets its certificate once its DNS record points at this server.
+www.oneby8.com, one.ai8ht.pro {
+	redir https://oneby8.com{uri} permanent
 }

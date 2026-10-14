@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-audit-logs ai-loop" role="img" aria-label="Audit Logs (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiPop{0%,24%,100%{transform:none}8%{transform:scale(.93)}16%{transform:scale(1.04)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-clk{animation:aiPop 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:17.2px 17.2px}
+}
+</style>
+<path class="f " fill-rule="evenodd" d="M3 4.1Q3 2.6 4.5 2.6L11.9 2.6Q13.4 2.6 14.46 3.66L15.54 4.74Q16.6 5.8 16.6 7.3L16.6 10.27Q16.6 11.23 15.68 11.48L15.68 11.48Q14.75 11.72 13.95 12.25L13.95 12.25Q13.15 12.77 12.55 13.53L12.55 13.53Q11.96 14.28 11.63 15.18L11.63 15.18Q11.31 16.08 11.28 17.04L11.28 17.04Q11.25 18 11.53 18.91L11.53 18.91Q11.81 19.83 12.36 20.61L12.36 20.61Q12.91 21.4 11.95 21.4L4.5 21.4Q3 21.4 3 19.9ZM5.8 8.1Q5.8 7.4 6.5 7.4L12.5 7.4Q13.2 7.4 13.2 8.1L13.2 8.5Q13.2 9.2 12.5 9.2L6.5 9.2Q5.8 9.2 5.8 8.5ZM5.8 11.9Q5.8 11.2 6.5 11.2L10.5 11.2Q11.2 11.2 11.2 11.9L11.2 12.3Q11.2 13 10.5 13L6.5 13Q5.8 13 5.8 12.3ZM5.8 15.7Q5.8 15 6.5 15L8.7 15Q9.4 15 9.4 15.7L9.4 16.1Q9.4 16.8 8.7 16.8L6.5 16.8Q5.8 16.8 5.8 16.1Z"/><g class="s"><path class="f p-clk" fill-rule="evenodd" d="M12.6 17.2a4.6 4.6 0 1 0 9.2 0a4.6 4.6 0 1 0 -9.2 0ZM16.8 14.4Q16.4 14.4 16.4 14.8L16.4 17.66Q16.4 18.06 16.74 18.26L18.65 19.39Q18.99 19.59 19.2 19.24L19.6 18.56Q19.81 18.21 19.46 18.01L18.34 17.35Q18 17.14 18 16.74L18 14.8Q18 14.4 17.6 14.4Z"/></g>
+</svg>

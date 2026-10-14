@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+ system splash icon: the ONE "o" mark, already padded inside
+     its canvas so it clears the splash's circular mask. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/one_splash_icon"
+    android:inset="0dp" />

@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react';
+import { NaReason, NaValue, isMissing, isUnrecorded } from './naState.js';
+import { OperationsHome } from './rolePortal/operationsHome.js';
+import { formatDate } from './dates.js';
+import { codeLabel } from './labels.js';
+import { IllustrationArt, type IllustrationId } from './momentum/emptyState.js';
 import {
+  ApiRequestError,
   getLearnerCareerReadinessState,
   getProtectedAccessToken,
   getSecurityContext,
@@ -15,9 +21,6 @@ import {
   listInstitutionStudents,
   listInstitutionUnits,
   listMyNotifications,
-  listOperationsInvitations,
-  listOperationsOrganizations,
-  listOperationsUsersAccess,
   listStudentExams,
   type EmployerApplicantDto,
   type EmployerOpportunityDto,
@@ -28,9 +31,6 @@ import {
   type InstitutionStudentDto,
   type InstitutionUnitDto,
   type LearnerCareerReadinessState,
-  type OperationsInvitationDto,
-  type OperationsUserAccessDto,
-  type OrganizationManagementDto,
   type StudentActivityDto,
   type StudentExamDto,
   type StudentProfileDto,
@@ -67,7 +67,7 @@ function greeting(): string {
 
 // --- Shared primitives -------------------------------------------------------
 
-export function V2Ring({ percent, label, value, tone = '#1f55e5' }: {
+export function V2Ring({ percent, label, value, tone = 'var(--brand)' }: {
   readonly percent: number; readonly label: string; readonly value: string; readonly tone?: string;
 }): React.ReactElement {
   const clamped = Math.max(0, Math.min(100, percent));
@@ -75,8 +75,8 @@ export function V2Ring({ percent, label, value, tone = '#1f55e5' }: {
   return (
     <div className="v2-ring" role="img" aria-label={`${value} ${label}`}>
       <svg width="106" height="106">
-        <circle cx="53" cy="53" r="45" fill="none" stroke="#edf1f7" strokeWidth="10" />
-        <circle cx="53" cy="53" r="45" fill="none" stroke={tone} strokeWidth="10" strokeLinecap="round"
+        <circle cx="53" cy="53" r="45" fill="none" style={{ stroke: 'var(--surface-3)' }} strokeWidth="10" />
+        <circle cx="53" cy="53" r="45" fill="none" style={{ stroke: tone }} strokeWidth="10" strokeLinecap="round"
           strokeDasharray={`${(clamped / 100) * circumference} ${circumference}`} transform="rotate(-90 53 53)" />
       </svg>
       <div><b>{value}</b><small>{label}</small></div>
@@ -84,14 +84,21 @@ export function V2Ring({ percent, label, value, tone = '#1f55e5' }: {
   );
 }
 
-export function V2Stat({ icon, tone, value, label }: {
-  readonly icon: string; readonly tone: string; readonly value: React.ReactNode; readonly label: string;
-}): React.ReactElement {
-  return <div className="v2-card v2-stat"><span className={`v2-tile ${tone}`} aria-hidden="true">{icon}</span><div><b>{value}</b><small>{label}</small></div></div>;
+/** A stat tile. A missing value (NA, <5, Withheld, Too few answers) keeps its text, muted, with an optional reason. */
+export function V2Stat({ icon, tone, value, label, reason }: {
+  readonly icon: string; readonly tone: string; readonly value: React.ReactNode; readonly label: string; readonly reason?: string;
+}): React.ReactElement | null {
+  // Momentum re-skin: a tile with no source is hidden, never shown as "NA". Suppressed values stay.
+  if (isUnrecorded(value)) return null;
+  const missing = isMissing(value);
+  return <div className="v2-card v2-stat" data-na={missing ? 'true' : undefined}><span className={`v2-tile ${missing ? 'na-tile' : tone}`} aria-hidden="true">{icon}</span>
+    <div><b><NaValue value={value} /></b><small>{label}</small>{missing && reason ? <NaReason>{reason}</NaReason> : null}</div></div>;
 }
 
-export function V2Chip({ tone, children }: { readonly tone: string; readonly children: React.ReactNode }): React.ReactElement {
-  return <span className={`v2-chip ${tone}`}>{children}</span>;
+export function V2Chip({ tone, children }: { readonly tone: string; readonly children: React.ReactNode }): React.ReactElement | null {
+  if (children === 'NA') return null;
+  // A raw code passed as the whole label (ACTIVE, UNDER_REVIEW) reads as words.
+  return <span className={`v2-chip ${tone}`}>{typeof children === 'string' ? codeLabel(children) : children}</span>;
 }
 
 export function V2Bar({ percent, tone = '' }: { readonly percent: number; readonly tone?: string }): React.ReactElement {
@@ -105,12 +112,18 @@ function chipToneForState(state: string): string {
   return 'blue';
 }
 
-export function V2EmptyState({ icon, title, note, hint }: {
-  readonly icon: string; readonly title: string; readonly note: string; readonly hint?: string;
+/**
+ * The shared empty state. With `illustration` (re-skin phase 8) the matching Lens illustration
+ * replaces the emoji tile; the caller's own title and note stay, because they describe the real
+ * state of that list (see momentum/emptyState.tsx for the copy.json-driven <EmptyState>).
+ */
+export function V2EmptyState({ icon, title, note, hint, illustration }: {
+  readonly icon: string; readonly title: string; readonly note: string; readonly hint?: React.ReactNode;
+  readonly illustration?: IllustrationId;
 }): React.ReactElement {
   return (
-    <section className="v2-card v2-empty-state">
-      <span className="v2-empty-icon" aria-hidden="true">{icon}</span>
+    <section className={`v2-card v2-empty-state${illustration ? ' has-art es-host m-io' : ''}`} {...(illustration ? { 'data-empty-state': illustration } : {})}>
+      {illustration ? <IllustrationArt id={illustration} /> : <span className="v2-empty-icon" aria-hidden="true">{icon}</span>}
       <h2>{title}</h2>
       <p>{note}</p>
       {hint ? <p className="v2-empty-hint">{hint}</p> : null}
@@ -149,7 +162,7 @@ export function StudentDashboardV2({ studentName }: { readonly studentName: stri
   const now = Date.now();
   const exams = data.exams ?? [];
   const lessons = data.learner?.catalog?.modules?.flatMap((module) => module.lessons ?? []) ?? [];
-  const completedLessonIds = new Set(data.learner?.progress.filter((item) => item.state === 'COMPLETED').map((item) => item.lessonVersionId) ?? []);
+  const completedLessonIds = new Set(data.learner?.progress?.filter((item) => item.state === 'COMPLETED').map((item) => item.lessonVersionId) ?? []);
   const openExams = exams.filter((exam) => exam.openAttemptId !== null || (now >= Date.parse(exam.startsAt) && now <= Date.parse(exam.endsAt) && exam.attemptsUsed < exam.attemptsAllowed));
   const results = exams.filter((exam) => exam.latestResult !== null);
   const bestScore = results.length ? Math.max(...results.map((exam) => exam.latestResult!.percentage)) : null;
@@ -170,7 +183,7 @@ export function StudentDashboardV2({ studentName }: { readonly studentName: stri
             <p className="v2-hero-over">Your placement-readiness workspace</p>
             <h1>{greeting()}, {firstName} 👋</h1>
             <p>{nextDeadline
-              ? <>Your next assessment window closes <b>{new Date(nextDeadline).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</b>. Keep building your evidence.</>
+              ? <>Your next assessment window closes <b>{formatDate(nextDeadline)}</b>. Keep building your evidence.</>
               : 'No assessment window is open right now. Keep building your evidence.'}</p>
             <div className="v2-hero-chips">
               {(data.activity?.currentStreakDays ?? 0) > 0 ? <V2Chip tone="amber">🔥 {data.activity!.currentStreakDays}-day streak</V2Chip> : null}
@@ -195,7 +208,7 @@ export function StudentDashboardV2({ studentName }: { readonly studentName: stri
               {openExams.slice(0, 2).map((exam) => (
                 <div key={exam.id} className="v2-list-row">
                   <span className="v2-tile blue" aria-hidden="true">📝</span>
-                  <div className="grow"><strong>{exam.title}</strong><small>{exam.openAttemptId ? 'Attempt in progress — resume it' : `Window closes ${new Date(exam.endsAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`} · {exam.attemptsUsed} of {exam.attemptsAllowed} attempts used</small></div>
+                  <div className="grow"><strong>{exam.title}</strong><small>{exam.openAttemptId ? 'Attempt in progress — resume it' : `Window closes ${formatDate(exam.endsAt)}`} · {exam.attemptsUsed} of {exam.attemptsAllowed} attempts used</small></div>
                   <button type="button" className="v2-btn small" onClick={() => go('/student/assessments')}>{exam.openAttemptId ? 'Resume' : 'Start'}</button>
                 </div>
               ))}
@@ -291,7 +304,7 @@ export function StudentDashboardV2({ studentName }: { readonly studentName: stri
           <button type="button" onClick={() => go('/student/help')}>How do I take an assessment?</button>
           <button type="button" onClick={() => go('/student/help')}>Why can&apos;t I start my assessment?</button>
         </section>
-        {data.notifications?.notifications.length ? (
+        {data.notifications?.notifications?.length ? (
           <section className="v2-card">
             <div className="v2-card-head"><h2>Notifications</h2>{data.notifications.unreadCount > 0 ? <V2Chip tone="amber">{data.notifications.unreadCount} new</V2Chip> : null}</div>
             <div className="v2-list">
@@ -378,9 +391,9 @@ export function InstitutionDashboardV2({ institutionId, basePath }: { readonly i
             <p className="v2-hero-over">Institution workspace</p>
             <h1>{greeting()} 👋</h1>
             <p>{attention.length ? <><b>{attention[0]!.title}</b> — {attention[0]!.detail}.</> : 'Nothing needs your attention right now.'}</p>
-            <div className="v2-hero-chips"><V2Chip tone="green">Backend enforced</V2Chip><V2Chip tone="blue">Institution scope only</V2Chip></div>
+            <div className="v2-hero-chips"><V2Chip tone="green">Access-controlled</V2Chip><V2Chip tone="blue">Institution scope only</V2Chip></div>
           </div>
-          {data.results ? <V2Ring percent={data.results.summary.averagePercentage} value={`${data.results.summary.averagePercentage}%`} label={`CLASS AVERAGE · ${data.results.exam.subjectName.toUpperCase()}`} tone="#0d6b4f" /> : null}
+          {data.results ? <V2Ring percent={data.results.summary.averagePercentage} value={`${data.results.summary.averagePercentage}%`} label={`CLASS AVERAGE · ${data.results.exam.subjectName.toUpperCase()}`} tone="var(--ok)" /> : null}
         </div>
 
         <div className="v2-row v2-cols-4">
@@ -399,10 +412,10 @@ export function InstitutionDashboardV2({ institutionId, basePath }: { readonly i
                   <span className={`v2-tile ${exam.lifecycleState === 'PUBLISHED' ? 'green' : 'amber'}`} aria-hidden="true">{exam.lifecycleState === 'PUBLISHED' ? '📝' : '✏️'}</span>
                   <div className="grow">
                     <strong>{exam.title}</strong>
-                    <small>{new Date(exam.startsAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} → {new Date(exam.endsAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · {exam.totalMarks} marks · {Math.round(exam.durationSeconds / 60)} min · {exam.assignedCount} assigned</small>
+                    <small>{formatDate(exam.startsAt)} → {formatDate(exam.endsAt)} · {exam.totalMarks} marks · {Math.round(exam.durationSeconds / 60)} min · {exam.assignedCount} assigned</small>
                     {exam.assignedCount > 0 ? <><V2Bar percent={(exam.completedAttempts / exam.assignedCount) * 100} tone="green" /><small>{exam.completedAttempts} of {exam.assignedCount} attempts completed</small></> : null}
                   </div>
-                  <V2Chip tone={chipToneForState(exam.lifecycleState)}>{exam.lifecycleState}</V2Chip>
+                  <V2Chip tone={chipToneForState(exam.lifecycleState)}>{codeLabel(exam.lifecycleState)}</V2Chip>
                 </div>
               ))}
             </div>
@@ -474,7 +487,7 @@ export function InstitutionDashboardV2({ institutionId, basePath }: { readonly i
               {memberships.slice(0, 4).map((member) => (
                 <div key={member.id} className="v2-list-row">
                   <div className="grow"><strong>{member.email}</strong><small>{prettify(member.role)}</small></div>
-                  <V2Chip tone={chipToneForState(member.state)}>{member.state}</V2Chip>
+                  <V2Chip tone={chipToneForState(member.state)}>{codeLabel(member.state)}</V2Chip>
                 </div>
               ))}
             </div>
@@ -550,9 +563,9 @@ export function EmployerDashboardV2({ basePath }: { readonly basePath: string })
             <p className="v2-hero-over">Employer workspace</p>
             <h1>{greeting()} 👋</h1>
             <p>{openApplications > 0 ? <><b>{openApplications} open application{openApplications === 1 ? '' : 's'}</b> across your roles await review.</> : 'No open applications right now.'}</p>
-            <div className="v2-hero-chips"><V2Chip tone="green">Backend enforced</V2Chip><V2Chip tone="amber">Consent-based candidate access</V2Chip></div>
+            <div className="v2-hero-chips"><V2Chip tone="green">Access-controlled</V2Chip><V2Chip tone="amber">Consent-based candidate access</V2Chip></div>
           </div>
-          {totalApplications > 0 ? <V2Ring percent={(openApplications / totalApplications) * 100} value={`${openApplications}/${totalApplications}`} label="APPLICATIONS OPEN" tone="#b45309" /> : null}
+          {totalApplications > 0 ? <V2Ring percent={(openApplications / totalApplications) * 100} value={`${openApplications}/${totalApplications}`} label="APPLICATIONS OPEN" tone="var(--warn)" /> : null}
         </div>
 
         <div className="v2-row v2-cols-4">
@@ -571,10 +584,10 @@ export function EmployerDashboardV2({ basePath }: { readonly basePath: string })
                   <span className={`v2-tile ${opportunity.lifecycleState === 'PUBLISHED' ? 'blue' : 'amber'}`} aria-hidden="true">{opportunity.lifecycleState === 'PUBLISHED' ? '💼' : '✏️'}</span>
                   <div className="grow">
                     <strong>{opportunity.title ?? opportunity.referenceCode}</strong>
-                    <small>{[opportunity.employmentType ? prettify(opportunity.employmentType) : null, opportunity.locationCity, opportunity.applicationDeadline ? `deadline ${new Date(opportunity.applicationDeadline).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : null].filter(Boolean).join(' · ') || 'Details pending'}</small>
+                    <small>{[opportunity.employmentType ? prettify(opportunity.employmentType) : null, opportunity.locationCity, opportunity.applicationDeadline ? `deadline ${formatDate(opportunity.applicationDeadline)}` : null].filter(Boolean).join(' · ') || 'Details pending'}</small>
                     {opportunity.applicationCount > 0 ? <><V2Bar percent={((opportunity.applicationCount - opportunity.openApplicationCount) / opportunity.applicationCount) * 100} /><small>{opportunity.applicationCount} applied · {opportunity.openApplicationCount} open</small></> : null}
                   </div>
-                  <V2Chip tone={chipToneForState(opportunity.lifecycleState)}>{opportunity.lifecycleState}</V2Chip>
+                  <V2Chip tone={chipToneForState(opportunity.lifecycleState)}>{codeLabel(opportunity.lifecycleState)}</V2Chip>
                 </div>
               ))}
             </div>
@@ -623,125 +636,12 @@ export function EmployerDashboardV2({ basePath }: { readonly basePath: string })
 }
 
 // --- Operations --------------------------------------------------------------
-
-interface OperationsDashboardData {
-  readonly organizations: readonly OrganizationManagementDto[] | null;
-  readonly invitations: readonly OperationsInvitationDto[] | null;
-  readonly users: readonly OperationsUserAccessDto[] | null;
-}
+//
+// OPS-03: the Overview renders one server-side summary (GET /operations/overview). Re-skin phase 7
+// moved it to the approved Momentum composition in rolePortal/operationsHome.tsx, where a section
+// the caller cannot access is left out rather than printed as NA. This name stays so callers do
+// not change.
 
 export function OperationsDashboardV2({ basePath }: { readonly basePath: string }): React.ReactElement {
-  const token = getProtectedAccessToken();
-  const [data, setData] = useState<OperationsDashboardData | null>(null);
-  useEffect(() => {
-    if (!token) return undefined;
-    const controller = new AbortController();
-    void Promise.all([
-      listOperationsOrganizations(token, {}, controller.signal).then((response) => response.organizations).catch(() => null),
-      listOperationsInvitations(token, '', controller.signal).then((response) => response.invitations).catch(() => null),
-      listOperationsUsersAccess(token, '', controller.signal).then((response) => response.users).catch(() => null),
-    ]).then(([organizations, invitations, users]) => setData({ organizations, invitations, users }));
-    return () => controller.abort();
-  }, [token]);
-
-  if (!data) return <section className="v2-card"><h2>Overview</h2><p className="v2-empty">Loading the operations workspace…</p></section>;
-
-  const organizations = data.organizations ?? [];
-  const institutions = organizations.filter((organization) => organization.kind === 'INSTITUTION');
-  const employers = organizations.filter((organization) => organization.kind === 'EMPLOYER');
-  const invitations = data.invitations ?? [];
-  const pendingInvitations = invitations.filter((invitation) => invitation.state === 'PENDING');
-  const acceptedInvitations = invitations.filter((invitation) => invitation.state === 'ACCEPTED');
-  const users = data.users ?? [];
-  const studentAccounts = users.filter((user) => user.studentRelationshipCount > 0);
-  const orgAccounts = users.filter((user) => user.memberships.length > 0);
-  const recentInvitations = [...invitations].sort((left, right) => right.createdAt.localeCompare(left.createdAt)).slice(0, 4);
-
-  return (
-    <div className="v2-page">
-      <div className="v2-content">
-        <div className="v2-hero">
-          <div>
-            <p className="v2-hero-over">ONE Platform · Operations workspace</p>
-            <h1>{greeting()} 👋</h1>
-            <p>{pendingInvitations.length ? <><b>{pendingInvitations.length} invitation{pendingInvitations.length === 1 ? '' : 's'}</b> pending acceptance.</> : 'No invitations are pending.'}</p>
-            <div className="v2-hero-chips"><V2Chip tone="green">Backend enforced</V2Chip><V2Chip tone="slate">Full mutations on web · view-only in app</V2Chip></div>
-          </div>
-          {invitations.length ? <V2Ring percent={(acceptedInvitations.length / invitations.length) * 100} value={`${acceptedInvitations.length}/${invitations.length}`} label="INVITATIONS ACCEPTED" tone="#475569" /> : null}
-        </div>
-
-        <div className="v2-row v2-cols-4">
-          <V2Stat icon="🏛️" tone="blue" value={organizations.length} label="Organizations" />
-          {data.users ? <V2Stat icon="👥" tone="teal" value={users.length} label="Accounts" /> : null}
-          <V2Stat icon="✉️" tone="amber" value={pendingInvitations.length} label="Pending invitations" />
-          <V2Stat icon="🏢" tone="purple" value={<>{institutions.length} <span className="v2-stat-extra">inst</span> · {employers.length} <span className="v2-stat-extra">emp</span></>} label="By kind" />
-        </div>
-
-        {organizations.length ? (
-          <section className="v2-card">
-            <div className="v2-card-head"><h2>Organizations</h2><button type="button" className="v2-link" onClick={() => go(`${basePath}/organizations`)}>Open Organizations</button></div>
-            <div className="v2-list">
-              {organizations.slice(0, 5).map((organization) => (
-                <div key={organization.id} className="v2-list-row">
-                  <span className={`v2-tile ${organization.kind === 'INSTITUTION' ? 'blue' : 'amber'}`} aria-hidden="true">{organization.kind === 'INSTITUTION' ? '🏛️' : '🏢'}</span>
-                  <div className="grow"><strong>{organization.profile.displayName ?? organization.legalName}</strong><small>{prettify(organization.kind)} · {prettify(organization.verificationState)}</small></div>
-                  <V2Chip tone={organization.active ? 'green' : 'slate'}>{organization.active ? 'ACTIVE' : 'INACTIVE'}</V2Chip>
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        <div className="v2-row v2-cols-2">
-          {invitations.length ? (
-            <section className="v2-card">
-              <div className="v2-card-head"><h2>Invitations</h2>{pendingInvitations.length ? <V2Chip tone="amber">{pendingInvitations.length} pending</V2Chip> : null}</div>
-              <div className="v2-list">
-                {recentInvitations.map((invitation) => (
-                  <div key={invitation.id} className="v2-list-row">
-                    <div className="grow"><strong>{invitation.recipientEmail}</strong><small>{prettify(invitation.role)}{invitation.organization ? ` · ${invitation.organization.legalName}` : ''}</small></div>
-                    <V2Chip tone={chipToneForState(invitation.state)}>{invitation.state}</V2Chip>
-                  </div>
-                ))}
-              </div>
-              <p className="v2-boundary">Membership is created only after the verified recipient accepts.</p>
-            </section>
-          ) : null}
-          {data.users ? (
-            <section className="v2-card">
-              <div className="v2-card-head"><h2>Accounts</h2><button type="button" className="v2-link" onClick={() => go(`${basePath}/users`)}>Open Users</button></div>
-              <div className="v2-list">
-                <div className="v2-list-row"><div className="grow"><strong>Student accounts</strong><V2Bar percent={(studentAccounts.length / Math.max(1, users.length)) * 100} /></div><V2Chip tone="blue">{studentAccounts.length}</V2Chip></div>
-                <div className="v2-list-row"><div className="grow"><strong>With organization roles</strong><V2Bar percent={(orgAccounts.length / Math.max(1, users.length)) * 100} tone="green" /></div><V2Chip tone="green">{orgAccounts.length}</V2Chip></div>
-                <div className="v2-list-row"><div className="grow"><strong>All accounts</strong><V2Bar percent={100} tone="" /></div><V2Chip tone="slate">{users.length}</V2Chip></div>
-              </div>
-            </section>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="v2-rail">
-        {pendingInvitations.length ? (
-          <section className="v2-card">
-            <div className="v2-card-head"><h2>Needs attention</h2><V2Chip tone="amber">{pendingInvitations.length}</V2Chip></div>
-            <div className="v2-list">
-              {pendingInvitations.slice(0, 3).map((invitation) => {
-                const date = shortDate(invitation.expiresAt);
-                return (
-                  <div key={invitation.id} className="v2-list-row">
-                    <span className="v2-date"><b>{date.month}</b><span>{date.day}</span></span>
-                    <div className="grow"><strong>Invitation expires</strong><small>{invitation.recipientEmail} · {prettify(invitation.role)}</small></div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        ) : null}
-        <section className="v2-card">
-          <div className="v2-card-head"><h2>Protected boundaries</h2></div>
-          <p className="v2-empty">Operations never sees student private readiness state, employer hiring records beyond scope, or secrets. The mobile app is view-only for this role by policy.</p>
-        </section>
-      </div>
-    </div>
-  );
+  return <OperationsHome basePath={basePath} />;
 }

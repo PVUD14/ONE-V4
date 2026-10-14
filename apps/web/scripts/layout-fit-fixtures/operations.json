@@ -1,0 +1,4991 @@
+{
+ "email": "operations@demo.oneby8.com",
+ "landing": "/operations/admin",
+ "labels": [
+  "Overview",
+  "Organizations",
+  "Organization Detail",
+  "Users",
+  "User Detail",
+  "Verification",
+  "Trust and Safety",
+  "AI Operations",
+  "Subscriptions",
+  "Billing",
+  "Analytics",
+  "System Health",
+  "Audit Logs",
+  "Security",
+  "Feature Flags",
+  "Support",
+  "Settings"
+ ],
+ "responses": {
+  "GET /health": {
+   "status": 200,
+   "body": {
+    "status": "ok"
+   }
+  },
+  "GET /api/v1/security/context": {
+   "status": 200,
+   "body": {
+    "userId": "3304180c-6206-4b91-8334-c10bd9b7c9fa",
+    "selectedOrganizationId": null,
+    "memberships": [
+     {
+      "organizationId": "04f1ac5b-d952-4b92-93cb-04bc8db5a5a0",
+      "role": "OPERATIONS_ADMIN",
+      "scope": {
+       "organizationId": "04f1ac5b-d952-4b92-93cb-04bc8db5a5a0"
+      },
+      "capabilities": [
+       "OPS_ORG_MANAGE",
+       "OPS_VERIFY",
+       "OPS_FLAGS_MANAGE",
+       "OPS_JOBS_REPLAY",
+       "SUPPORT_CASES",
+       "SUPPORT_ACCOUNT_LOOKUP",
+       "TRUST_SAFETY_INVESTIGATE",
+       "TRUST_SAFETY_ENFORCE",
+       "PRIVACY_REQUESTS",
+       "PRIVACY_HOLDS",
+       "SECURITY_AUDIT_SEARCH",
+       "AI_OPS_VIEW",
+       "ANALYTICS_VIEW",
+       "ACCOUNT_MANAGE",
+       "COMMS_TEMPLATES"
+      ]
+     }
+    ],
+    "studentRelationships": [],
+    "formerStudentRelationships": [],
+    "correlationId": "4c1228fd-16c2-45fc-96c6-b24368c5b3a9"
+   }
+  },
+  "GET /api/v1/me/consents/privacy-notice": {
+   "status": 200,
+   "body": {
+    "requiredVersion": null,
+    "grantedVersion": null,
+    "required": false,
+    "correlationId": "53540c6e-3a40-4df0-8f17-8bf387ee1f44"
+   }
+  },
+  "GET /api/v1/operations/overview": {
+   "status": 200,
+   "body": {
+    "overview": {
+     "generatedAt": "2026-10-08T11:48:22.371Z",
+     "organizations": {
+      "total": {
+       "value": 2,
+       "capped": false
+      },
+      "active": {
+       "value": 2,
+       "capped": false
+      },
+      "institutions": {
+       "total": {
+        "value": 1,
+        "capped": false
+       },
+       "byVerification": {
+        "PENDING": {
+         "value": 0,
+         "capped": false
+        },
+        "UNDER_REVIEW": {
+         "value": 0,
+         "capped": false
+        },
+        "VERIFIED": {
+         "value": 1,
+         "capped": false
+        },
+        "REJECTED": {
+         "value": 0,
+         "capped": false
+        },
+        "SUSPENDED": {
+         "value": 0,
+         "capped": false
+        }
+       }
+      },
+      "employers": {
+       "total": {
+        "value": 1,
+        "capped": false
+       },
+       "byVerification": {
+        "PENDING": {
+         "value": 0,
+         "capped": false
+        },
+        "UNDER_REVIEW": {
+         "value": 0,
+         "capped": false
+        },
+        "VERIFIED": {
+         "value": 1,
+         "capped": false
+        },
+        "REJECTED": {
+         "value": 0,
+         "capped": false
+        },
+        "SUSPENDED": {
+         "value": 0,
+         "capped": false
+        }
+       }
+      },
+      "recent": [
+       {
+        "id": "ea7073f5-6a18-4866-b126-09ff8a5d5256",
+        "kind": "EMPLOYER",
+        "name": "Corvane Labs",
+        "verificationState": "VERIFIED",
+        "active": true
+       },
+       {
+        "id": "8e246485-4565-48a9-9e69-de906633a082",
+        "kind": "INSTITUTION",
+        "name": "Lakeview Institute of Technology",
+        "verificationState": "VERIFIED",
+        "active": true
+       }
+      ]
+     },
+     "verification": {
+      "awaitingDecision": {
+       "value": 0,
+       "capped": false
+      },
+      "underReview": {
+       "value": 0,
+       "capped": false
+      }
+     },
+     "employerAccessRequests": {
+      "pending": {
+       "value": 0,
+       "capped": false
+      },
+      "oldestPendingAt": null
+     },
+     "invitations": {
+      "staff": {
+       "total": {
+        "value": 1,
+        "capped": false
+       },
+       "accepted": {
+        "value": 0,
+        "capped": false
+       },
+       "pending": {
+        "value": 1,
+        "capped": false
+       },
+       "pendingOver72Hours": {
+        "value": 0,
+        "capped": false
+       },
+       "expiredUnaccepted": {
+        "value": 0,
+        "capped": false
+       }
+      },
+      "expiringSoon": [
+       {
+        "id": "00a05ddd-2486-451a-8971-12745c37d5a2",
+        "role": "FACULTY_LECTURER",
+        "organizationName": "Lakeview Institute of Technology",
+        "expiresAt": "2026-10-21T11:48:39.876Z"
+       }
+      ],
+      "recent": [
+       {
+        "id": "00a05ddd-2486-451a-8971-12745c37d5a2",
+        "role": "FACULTY_LECTURER",
+        "organizationName": "Lakeview Institute of Technology",
+        "state": "PENDING",
+        "createdAt": "2026-10-07T11:48:39.877Z"
+       }
+      ],
+      "student": {
+       "pending": {
+        "value": 0,
+        "capped": false
+       },
+       "pendingOver72Hours": {
+        "value": 0,
+        "capped": false
+       },
+       "notDelivered": {
+        "value": 0,
+        "capped": false
+       },
+       "byDelivery": {
+        "NOT_SENT": {
+         "value": 0,
+         "capped": false
+        },
+        "SENT": {
+         "value": 0,
+         "capped": false
+        },
+        "FAILED": {
+         "value": 0,
+         "capped": false
+        },
+        "BOUNCED": {
+         "value": 0,
+         "capped": false
+        },
+        "NOT_CONFIGURED": {
+         "value": 0,
+         "capped": false
+        }
+       }
+      }
+     },
+     "accounts": {
+      "total": {
+       "suppressed": false,
+       "value": 45,
+       "capped": false
+      },
+      "students": {
+       "suppressed": false,
+       "value": 33,
+       "capped": false
+      },
+      "withOrganizationRoles": {
+       "suppressed": false,
+       "value": 12,
+       "capped": false
+      }
+     },
+     "trustSafety": {
+      "open": {
+       "value": 0,
+       "capped": false
+      },
+      "unassigned": {
+       "value": 0,
+       "capped": false
+      },
+      "bySeverity": {
+       "CRITICAL": {
+        "value": 0,
+        "capped": false
+       },
+       "HIGH": {
+        "value": 0,
+        "capped": false
+       },
+       "MEDIUM": {
+        "value": 0,
+        "capped": false
+       },
+       "LOW": {
+        "value": 0,
+        "capped": false
+       }
+      }
+     },
+     "jobs": {
+      "failedEvents": {
+       "value": 3,
+       "capped": false
+      },
+      "openAlerts": {
+       "value": 0,
+       "capped": false
+      }
+     },
+     "privacyRequests": {
+      "open": {
+       "value": 0,
+       "capped": false
+      },
+      "openExports": {
+       "value": 0,
+       "capped": false
+      },
+      "openDeletions": {
+       "value": 0,
+       "capped": false
+      },
+      "deletionsDueWithin7Days": {
+       "value": 0,
+       "capped": false
+      },
+      "failed": {
+       "value": 0,
+       "capped": false
+      }
+     },
+     "privacyHolds": {
+      "active": {
+       "value": 0,
+       "capped": false
+      }
+     },
+     "approvals": null,
+     "support": {
+      "open": {
+       "value": 0,
+       "capped": false
+      },
+      "overdue": {
+       "value": 0,
+       "capped": false
+      },
+      "unassigned": {
+       "value": 0,
+       "capped": false
+      }
+     }
+    },
+    "viewer": {
+     "sections": [
+      "organizations",
+      "verification",
+      "employerAccessRequests",
+      "invitations",
+      "accounts",
+      "trustSafety",
+      "jobs",
+      "privacyRequests",
+      "privacyHolds",
+      "support"
+     ]
+    },
+    "correlationId": "e4992fde-51f9-4271-a1d8-222938d43ffe"
+   }
+  },
+  "GET /api/v1/operations/organizations": {
+   "status": 200,
+   "body": {
+    "organizations": [
+     {
+      "id": "ea7073f5-6a18-4866-b126-09ff8a5d5256",
+      "kind": "EMPLOYER",
+      "legalName": "Corvane Labs Private Limited",
+      "verificationState": "VERIFIED",
+      "active": true,
+      "createdAt": "2026-10-07 05:46:51.068943+00",
+      "updatedAt": "2026-10-07 05:46:51.068943+00",
+      "profile": {
+       "displayName": "Corvane Labs",
+       "websiteUrl": "https://corvane.example",
+       "countryCode": "IN",
+       "stateOrProvince": "Karnataka",
+       "city": "Bengaluru",
+       "postalCode": null,
+       "addressLine1": null,
+       "addressLine2": null,
+       "primaryContactEmail": "talent@corvane.example",
+       "institutionType": null
+      },
+      "initialAdminInvitation": null
+     },
+     {
+      "id": "8e246485-4565-48a9-9e69-de906633a082",
+      "kind": "INSTITUTION",
+      "legalName": "Lakeview Institute of Technology",
+      "verificationState": "VERIFIED",
+      "active": true,
+      "createdAt": "2026-10-07 05:46:51.068943+00",
+      "updatedAt": "2026-10-07 05:46:51.068943+00",
+      "profile": {
+       "displayName": "Lakeview Institute of Technology",
+       "websiteUrl": "https://lakeview.example",
+       "countryCode": "IN",
+       "stateOrProvince": "Karnataka",
+       "city": "Mysuru",
+       "postalCode": null,
+       "addressLine1": null,
+       "addressLine2": null,
+       "primaryContactEmail": "placement@lakeview.example",
+       "institutionType": "ENGINEERING_COLLEGE"
+      },
+      "initialAdminInvitation": null
+     }
+    ],
+    "correlationId": "0896967b-011c-4b99-8c26-6561eedaaec9"
+   }
+  },
+  "GET /api/v1/operations/growth-handoffs": {
+   "status": 200,
+   "body": {
+    "requests": [],
+    "declineReasons": [
+     "NOT_A_REAL_COLLEGE",
+     "DUPLICATE_OF_EXISTING",
+     "INCOMPLETE",
+     "CONTRACT_NOT_CONFIRMED"
+    ],
+    "correlationId": "9960c0d1-5202-4875-9b8d-6098ead52bee"
+   }
+  },
+  "GET /api/v1/operations/employer-access-requests?state=PENDING": {
+   "status": 200,
+   "body": {
+    "requests": [],
+    "nextCursor": null,
+    "reasonCodes": {
+     "ONBOARDED": [
+      "ORGANISATION_CREATED",
+      "EXISTING_ORGANISATION"
+     ],
+     "DECLINED": [
+      "NOT_AN_EMPLOYER",
+      "COULD_NOT_CONFIRM",
+      "DUPLICATE_REQUEST",
+      "OUT_OF_SCOPE"
+     ],
+     "SPAM": [
+      "BULK_SUBMISSION",
+      "FAKE_DETAILS",
+      "ABUSIVE_CONTENT"
+     ]
+    },
+    "correlationId": "b0378844-2c85-44cf-8ec4-11512d2f2e36"
+   }
+  },
+  "GET /api/v1/operations/organizations?kind=INSTITUTION": {
+   "status": 200,
+   "body": {
+    "organizations": [
+     {
+      "id": "8e246485-4565-48a9-9e69-de906633a082",
+      "kind": "INSTITUTION",
+      "legalName": "Lakeview Institute of Technology",
+      "verificationState": "VERIFIED",
+      "active": true,
+      "createdAt": "2026-10-07 05:46:51.068943+00",
+      "updatedAt": "2026-10-07 05:46:51.068943+00",
+      "profile": {
+       "displayName": "Lakeview Institute of Technology",
+       "websiteUrl": "https://lakeview.example",
+       "countryCode": "IN",
+       "stateOrProvince": "Karnataka",
+       "city": "Mysuru",
+       "postalCode": null,
+       "addressLine1": null,
+       "addressLine2": null,
+       "primaryContactEmail": "placement@lakeview.example",
+       "institutionType": "ENGINEERING_COLLEGE"
+      },
+      "initialAdminInvitation": null
+     }
+    ],
+    "correlationId": "800b5073-a925-48c1-a76f-e84d2008dc8f"
+   }
+  },
+  "GET /api/v1/operations/college-accounts/policy": {
+   "status": 200,
+   "body": {
+    "contactRoles": [
+     "PRINCIPAL",
+     "PLACEMENT_OFFICER",
+     "ACADEMIC_COORDINATOR",
+     "IT_CONTACT",
+     "ACCOUNTS",
+     "OTHER"
+    ],
+    "reasons": {
+     "update": [
+      "NEW_CONTRACT",
+      "RENEWAL_AGREED",
+      "OWNER_HANDOVER",
+      "CORRECTION"
+     ],
+     "addContact": [
+      "NEW_CONTACT",
+      "CONTACT_REPLACED",
+      "CORRECTION"
+     ],
+     "removeContact": [
+      "CONTACT_LEFT",
+      "CONTACT_REPLACED",
+      "PRIVACY_REQUEST",
+      "CORRECTION"
+     ],
+     "reveal": [
+      "RENEWAL_OUTREACH",
+      "SUPPORT_FOLLOW_UP",
+      "ONBOARDING",
+      "ESCALATION"
+     ]
+    },
+    "owners": [
+     {
+      "membershipId": "7206ae0c-3067-47f2-be99-4ba3e653b000",
+      "email": "content.author@demo.oneby8.com",
+      "role": "OPERATIONS_ADMIN"
+     },
+     {
+      "membershipId": "50e858c1-4803-4348-8c4c-bb5976a05852",
+      "email": "content.publisher@demo.oneby8.com",
+      "role": "OPERATIONS_ADMIN"
+     },
+     {
+      "membershipId": "9324ff86-bcd5-47e3-bed1-f7bad93d1cd1",
+      "email": "content.reviewer@demo.oneby8.com",
+      "role": "OPERATIONS_ADMIN"
+     },
+     {
+      "membershipId": "dab93ac4-8cee-4420-b815-ad65dd02f5c3",
+      "email": "operations@demo.oneby8.com",
+      "role": "OPERATIONS_ADMIN"
+     }
+    ],
+    "correlationId": "126d7bcb-196d-42a2-9369-83fa4a7c0dfe"
+   }
+  },
+  "GET /api/v1/operations/support/policy": {
+   "status": 200,
+   "body": {
+    "viewer": {
+     "cases": true,
+     "accountLookup": true
+    },
+    "channels": [
+     "EMAIL",
+     "PHONE",
+     "WHATSAPP",
+     "IN_APP"
+    ],
+    "categories": [
+     "ACCOUNT_ACCESS",
+     "INVITATION",
+     "ONBOARDING",
+     "DATA_CORRECTION",
+     "PRIVACY_REQUEST",
+     "TECHNICAL_FAULT",
+     "HOW_TO",
+     "COMPLAINT",
+     "OTHER"
+    ],
+    "severities": [
+     "LOW",
+     "MEDIUM",
+     "HIGH",
+     "URGENT"
+    ],
+    "slaHours": {
+     "URGENT": 4,
+     "HIGH": 24,
+     "MEDIUM": 72,
+     "LOW": 120
+    },
+    "transitions": {
+     "OPEN": [
+      "IN_PROGRESS",
+      "WAITING_ON_CUSTOMER",
+      "RESOLVED",
+      "CLOSED"
+     ],
+     "IN_PROGRESS": [
+      "WAITING_ON_CUSTOMER",
+      "RESOLVED"
+     ],
+     "WAITING_ON_CUSTOMER": [
+      "IN_PROGRESS",
+      "RESOLVED",
+      "CLOSED"
+     ],
+     "RESOLVED": [
+      "IN_PROGRESS",
+      "CLOSED"
+     ],
+     "CLOSED": []
+    },
+    "reasons": {
+     "open": [
+      "CUSTOMER_CONTACT",
+      "OPERATOR_FOLLOW_UP",
+      "INSTITUTION_ESCALATION",
+      "MONITORING_ALERT"
+     ],
+     "transition": {
+      "IN_PROGRESS": [
+       "WORK_STARTED",
+       "CUSTOMER_REPLIED",
+       "REOPENED_NOT_FIXED"
+      ],
+      "WAITING_ON_CUSTOMER": [
+       "INFORMATION_REQUESTED",
+       "CONFIRMATION_REQUESTED"
+      ],
+      "RESOLVED": [
+       "FIXED",
+       "ANSWERED",
+       "NO_FAULT_FOUND",
+       "REFERRED_ELSEWHERE"
+      ],
+      "CLOSED": [
+       "CONFIRMED_WITH_CUSTOMER",
+       "NO_RESPONSE",
+       "DUPLICATE",
+       "MISDIRECTED"
+      ]
+     },
+     "note": [
+      "CASE_UPDATE",
+      "CUSTOMER_CONTACT",
+      "INTERNAL_FINDING"
+     ],
+     "assign": [
+      "TAKE_OWNERSHIP",
+      "REBALANCE",
+      "ESCALATION",
+      "CORRECTION"
+     ],
+     "reveal": [
+      "ACCOUNT_RECOVERY",
+      "IDENTITY_VERIFICATION",
+      "CUSTOMER_CALLBACK",
+      "PRIVACY_REQUEST"
+     ]
+    },
+    "assignees": [
+     {
+      "userId": "15061e67-c653-4af8-b910-f6f43a231830",
+      "email": "content.author@demo.oneby8.com",
+      "isSelf": false
+     },
+     {
+      "userId": "c24a7ee9-ae66-4951-af67-69e83d1dfd48",
+      "email": "content.publisher@demo.oneby8.com",
+      "isSelf": false
+     },
+     {
+      "userId": "3858d6f1-3082-45c3-96d6-8ef42da293d4",
+      "email": "content.reviewer@demo.oneby8.com",
+      "isSelf": false
+     },
+     {
+      "userId": "3304180c-6206-4b91-8334-c10bd9b7c9fa",
+      "email": "operations@demo.oneby8.com",
+      "isSelf": true
+     }
+    ],
+    "correlationId": "c96b5cb5-dc84-4a38-9c41-d1af37de13cb"
+   }
+  },
+  "GET /api/v1/operations/invitations": {
+   "status": 200,
+   "body": {
+    "invitations": [
+     {
+      "id": "00a05ddd-2486-451a-8971-12745c37d5a2",
+      "recipientEmail": "test@g.com",
+      "organization": {
+       "id": "8e246485-4565-48a9-9e69-de906633a082",
+       "legalName": "Lakeview Institute of Technology",
+       "kind": "INSTITUTION"
+      },
+      "role": "FACULTY_LECTURER",
+      "state": "PENDING",
+      "createdAt": "2026-10-07 11:48:39.877499+00",
+      "expiresAt": "2026-10-21 11:48:39.876+00",
+      "acceptedAt": null,
+      "revokedAt": null,
+      "delivery": {
+       "commandId": "011a3f1b-5259-4c48-9d83-3c4b93555c01",
+       "state": "PENDING",
+       "destinationRef": "invitation:00a05ddd-2486-451a-8971-12745c37d5a2",
+       "providerKind": null,
+       "providerReference": null,
+       "outcome": null
+      }
+     },
+     {
+      "id": "c7d80e27-5a3f-41f3-971f-04232f0b906a",
+      "recipientEmail": "sathaya@gmail.com",
+      "organization": {
+       "id": "8e246485-4565-48a9-9e69-de906633a082",
+       "legalName": "Lakeview Institute of Technology",
+       "kind": "INSTITUTION"
+      },
+      "role": null,
+      "state": "REVOKED",
+      "createdAt": "2026-10-07 11:25:02.278799+00",
+      "expiresAt": "2026-10-21 11:25:02.302+00",
+      "acceptedAt": null,
+      "revokedAt": "2026-10-07 11:26:55.273258+00",
+      "delivery": null
+     }
+    ],
+    "correlationId": "baa449a5-a72b-46fe-9bd6-4cbe932b71d2"
+   }
+  },
+  "GET /api/v1/operations/trust-safety/cases?includeClosed=false": {
+   "status": 200,
+   "body": {
+    "cases": [],
+    "pendingSignals": []
+   }
+  },
+  "GET /api/v1/operations/ai/usage?granularity=DAY": {
+   "status": 200,
+   "body": {
+    "granularity": "DAY",
+    "points": [],
+    "correlationId": "b7ce363c-8b1e-43c6-a747-4e7ace1fd0cb"
+   }
+  },
+  "GET /api/v1/operations/ai/usage/organizations?period=DAY": {
+   "status": 200,
+   "body": {
+    "period": "DAY",
+    "organizations": [],
+    "suppressionThreshold": 5,
+    "correlationId": "6ce564dd-a87e-4d4a-842c-0472181cbe40"
+   }
+  },
+  "GET /api/v1/operations/ai/evaluations": {
+   "status": 200,
+   "body": {
+    "evaluations": [],
+    "nextCursor": null,
+    "correlationId": "5e7b440e-57c2-4990-83c7-c71b166f90ae"
+   }
+  },
+  "GET /api/v1/operations/ai/policy": {
+   "status": 200,
+   "body": {
+    "reasons": {
+     "disable": [
+      "INCIDENT_MITIGATION",
+      "QUALITY_CONCERN",
+      "COST_CONTROL",
+      "ROLLBACK",
+      "NOT_NEEDED"
+     ],
+     "enable": [
+      "EVALUATION_COMPLETE",
+      "PILOT_ROLLOUT",
+      "INCIDENT_RESOLVED"
+     ],
+     "limitsLower": [
+      "COST_CONTROL",
+      "INCIDENT_MITIGATION",
+      "CORRECTION"
+     ],
+     "limitsRaise": [
+      "DEMAND_GROWTH",
+      "PILOT_EXPANSION",
+      "CORRECTION"
+     ],
+     "killSwitchEngage": [
+      "INCIDENT_MITIGATION",
+      "HARMFUL_OUTPUT",
+      "SUSPECTED_KEY_COMPROMISE",
+      "SPEND_RUNAWAY",
+      "PRECAUTION"
+     ],
+     "assistantDisable": [
+      "INCIDENT_MITIGATION",
+      "HARMFUL_OUTPUT",
+      "SUSPECTED_KEY_COMPROMISE",
+      "POLICY_REQUIREMENT",
+      "PRECAUTION"
+     ],
+     "evaluation": [
+      "INITIAL_BENCHMARK",
+      "MODEL_CHANGE",
+      "PROMPT_CHANGE",
+      "PERIODIC_REVIEW",
+      "INCIDENT_REVIEW"
+     ],
+     "flagChange": [
+      "PILOT_ROLLOUT",
+      "EVALUATION_COMPLETE",
+      "INCIDENT_MITIGATION",
+      "ROLLBACK"
+     ]
+    },
+    "bounds": {
+     "capWindows": [
+      "DAY",
+      "MONTH"
+     ],
+     "maxCap": 10000000,
+     "minInputChars": 100,
+     "maxInputChars": 500000,
+     "maxMetrics": 20
+    },
+    "decisions": [
+     "PASS",
+     "FAIL"
+    ],
+    "flags": {
+     "killSwitch": "ai.global-kill-switch",
+     "assistant": "ai.assistant"
+    },
+    "viewer": {
+     "canStop": true,
+     "canConfigure": false
+    },
+    "cost": {
+     "basis": "NO_PRICE_TABLE",
+     "text": "NA — ONE has no price table for any model, so cost is not estimated. Tokens are shown instead."
+    },
+    "correlationId": "316bde35-0f40-4e18-b3e3-894aeff98dc0"
+   }
+  },
+  "GET /api/v1/operations/ai/tutor-hints?view=sample": {
+   "status": 200,
+   "body": {
+    "view": "sample",
+    "hints": [],
+    "counts": {
+     "shown7d": 0,
+     "fallback7d": 0,
+     "published": 0,
+     "rejected": 0
+    },
+    "reasons": {
+     "approve": [
+      "ACCURATE_AND_SAFE"
+     ],
+     "reject": [
+      "LEAKS_ANSWER",
+      "WRONG_CONTENT",
+      "WRONG_LEVEL",
+      "WRONG_LANGUAGE",
+      "UNSAFE",
+      "POOR_TEACHING"
+     ]
+    },
+    "viewer": {
+     "canReview": false
+    },
+    "correlationId": "ed2f8e29-fa69-4851-a2a2-fa6c70fa3017"
+   }
+  },
+  "GET /api/v1/operations/ai/summary?period=DAY": {
+   "status": 200,
+   "body": {
+    "period": "DAY",
+    "periodStart": "2026-10-08T00:00:00Z",
+    "killSwitch": {
+     "key": "ai.global-kill-switch",
+     "enabled": false,
+     "lastChangedAt": null,
+     "lastReasonCode": null
+    },
+    "assistantFlag": {
+     "key": "ai.assistant",
+     "enabled": false,
+     "lastChangedAt": null,
+     "lastReasonCode": null
+    },
+    "features": [],
+    "failureClasses": [],
+    "totals": {
+     "succeeded": 0,
+     "refused": 0,
+     "failed": 0,
+     "inputTokens": 0,
+     "outputTokens": 0
+    },
+    "prompts": {
+     "registered": [
+      {
+       "key": "tutor-hint",
+       "version": 2,
+       "purpose": "One hint at the requested ladder level for a practice question, in the student's language; never the answer; anything else is redirected."
+      },
+      {
+       "key": "content-lesson-draft",
+       "version": 2,
+       "purpose": "A short lesson draft for one skill, in the requested language, for the content review queue."
+      },
+      {
+       "key": "content-answer-check",
+       "version": 1,
+       "purpose": "Solve a multiple-choice aptitude item independently and name the best option, so a reviewer sees where the key and the model disagree."
+      },
+      {
+       "key": "content-item-draft",
+       "version": 1,
+       "purpose": "One multiple-choice practice question with its answer, explanation and four-step hint ladder, for the question review queue."
+      },
+      {
+       "key": "tutor-hint",
+       "version": 1,
+       "purpose": "One hint at the requested ladder level for a practice question, in the student's language; never the answer; anything else is redirected."
+      },
+      {
+       "key": "content-lesson-draft",
+       "version": 1,
+       "purpose": "A short lesson draft for one skill, in the requested language, for the content review queue."
+      }
+     ],
+     "declared": [],
+     "inUse": []
+    },
+    "assistant": {
+     "serverSwitch": false,
+     "providerKeyConfigured": false,
+     "consoleSwitch": false,
+     "killSwitchEngaged": false,
+     "answering": false
+    },
+    "inference": {
+     "configured": false,
+     "reason": "BASE_URL_MISSING",
+     "providerKey": "unconfigured",
+     "endpointHost": null,
+     "model": null,
+     "keyConfigured": false,
+     "lastProbe": null
+    },
+    "cost": {
+     "value": null,
+     "basis": "NO_PRICE_TABLE",
+     "text": "NA — ONE has no price table for any model, so cost is not estimated. Tokens are shown instead."
+    },
+    "correlationId": "5940fd8b-54b7-4016-a71d-9daa3c5da36c"
+   }
+  },
+  "GET /api/v1/operations/ai/engine-health?days=14": {
+   "status": 200,
+   "body": {
+    "planner": {
+     "windowDays": 14,
+     "days": [
+      {
+       "day": "2026-09-25",
+       "decisions": {
+        "suppressed": true,
+        "value": null
+       }
+      },
+      {
+       "day": "2026-09-26",
+       "decisions": {
+        "suppressed": true,
+        "value": null
+       }
+      },
+      {
+       "day": "2026-09-27",
+       "decisions": {
+        "suppressed": true,
+        "value": null
+       }
+      },
+      {
+       "day": "2026-09-28",
+       "decisions": {
+        "suppressed": true,
+        "value": null
+       }
+      },
+      {
+       "day": "2026-09-29",
+       "decisions": {
+        "suppressed": true,
+        "value": null
+       }
+      },
+      {
+       "day": "2026-09-30",
+       "decisions": {
+        "suppressed": true,
+        "value": null
+       }
+      },
+      {
+       "day": "2026-10-01",
+       "decisions": {
+        "suppressed": true,
+        "value": null
+       }
+      },
+      {
+       "day": "2026-10-02",
+       "decisions": {
+        "suppressed": true,
+        "value": null
+       }
+      },
+      {
+       "day": "2026-10-03",
+       "decisions": {
+        "suppressed": true,
+        "value": null
+       }
+      },
+      {
+       "day": "2026-10-04",
+       "decisions": {
+        "suppressed": true,
+        "value": null
+       }
+      },
+      {
+       "day": "2026-10-05",
+       "decisions": {
+        "suppressed": true,
+        "value": null
+       }
+      },
+      {
+       "day": "2026-10-06",
+       "decisions": {
+        "suppressed": true,
+        "value": null
+       }
+      },
+      {
+       "day": "2026-10-07",
+       "decisions": {
+        "suppressed": true,
+        "value": null
+       }
+      },
+      {
+       "day": "2026-10-08",
+       "decisions": {
+        "suppressed": true,
+        "value": null
+       }
+      }
+     ],
+     "decisions": {
+      "suppressed": true,
+      "value": null
+     },
+     "overridden": {
+      "suppressed": true,
+      "value": null
+     },
+     "overrideRate": null,
+     "active": true,
+     "policyVersions": [
+      "learning-orchestrator-v1"
+     ]
+    },
+    "masteryShadow": {
+     "consentOffered": false,
+     "suppressed": true,
+     "studentsInScope": {
+      "suppressed": true,
+      "value": null
+     },
+     "algorithms": {
+      "live": "career-readiness-mastery-v1",
+      "engineBand": "learning-model-v1",
+      "projector": "learner-skill-state-v2",
+      "shadow": "mastery-bkt-v1"
+     },
+     "coverage": null,
+     "c3Adoption": null,
+     "bkt": null
+    },
+    "suppressionThreshold": 5,
+    "correlationId": "bb11f07f-ec99-460e-bfc1-53a2533fb8eb"
+   }
+  },
+  "GET /api/v1/operations/analytics/role-demand": {
+   "status": 200,
+   "body": {
+    "demand": {
+     "generatedAt": "2026-10-08T11:48:32.876Z",
+     "totals": {
+      "studentsWithTarget": {
+       "suppressed": false,
+       "value": 30
+      },
+      "roles": 108,
+      "catalogueRoles": 108,
+      "rolesMeetingPromotionRule": 0
+     },
+     "roles": [
+      {
+       "id": "0b2e11b7-2b4f-4f41-b192-0c2d2f54ec79",
+       "code": "SOFTWARE_ENGINEER",
+       "catalogueCode": "S01",
+       "title": "Associate Software Engineer / Programmer Analyst Trainee (IT services mass hiring)",
+       "family": "Engineering",
+       "catalogueFamily": "A",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V2",
+       "active": true,
+       "students": {
+        "suppressed": false,
+        "value": 11
+       },
+       "colleges": 1,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "5e3b6462-948b-426f-8209-1ecd335696f0",
+       "code": "DATA_ANALYST",
+       "catalogueCode": "D01",
+       "title": "Data Analyst",
+       "family": "Data",
+       "catalogueFamily": "B",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V2",
+       "active": true,
+       "students": {
+        "suppressed": false,
+        "value": 7
+       },
+       "colleges": 1,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "56f1c668-6846-4618-b112-5ec1b784c65a",
+       "code": "SOC_ANALYST",
+       "catalogueCode": "C01",
+       "title": "SOC Analyst L1",
+       "family": "Cyber Security",
+       "catalogueFamily": "B",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V1",
+       "active": true,
+       "students": {
+        "suppressed": false,
+        "value": 5
+       },
+       "colleges": 1,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "507af141-8cf1-4ea9-9dc4-8e6e71f4d2e8",
+       "code": "B01",
+       "catalogueCode": "B01",
+       "title": "Management Trainee (general)",
+       "family": "Business, finance, sales and operations",
+       "catalogueFamily": "F",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "29323b41-8a35-4656-8cd2-4b9725ce31f8",
+       "code": "B02",
+       "catalogueCode": "B02",
+       "title": "Business / Operations Analyst",
+       "family": "Business, finance, sales and operations",
+       "catalogueFamily": "F",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V2",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "d2fa8ccf-743c-44c7-a2d4-46a389614772",
+       "code": "B03",
+       "catalogueCode": "B03",
+       "title": "Associate Consultant (technology / management)",
+       "family": "Business, finance, sales and operations",
+       "catalogueFamily": "F",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "9f89a184-14ae-48ab-94be-c6ec2abd4d72",
+       "code": "B04",
+       "catalogueCode": "B04",
+       "title": "Financial Analyst",
+       "family": "Business, finance, sales and operations",
+       "catalogueFamily": "F",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "f1d98afb-636c-4717-bb1a-91f0aebfff6b",
+       "code": "B05",
+       "catalogueCode": "B05",
+       "title": "Bank Probationary Officer / Bank Officer",
+       "family": "Business, finance, sales and operations",
+       "catalogueFamily": "F",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V2",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "501127ae-346c-42bc-8a91-149d04c9ecac",
+       "code": "B06",
+       "catalogueCode": "B06",
+       "title": "Risk and Compliance Analyst (BFSI)",
+       "family": "Business, finance, sales and operations",
+       "catalogueFamily": "F",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "95746c92-c945-4e22-b577-ec860d57c343",
+       "code": "B07",
+       "catalogueCode": "B07",
+       "title": "Equity Research / Investment Analyst (entry)",
+       "family": "Business, finance, sales and operations",
+       "catalogueFamily": "F",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "6cba8142-c164-47bd-afc2-29046594b106",
+       "code": "B08",
+       "catalogueCode": "B08",
+       "title": "Pre-sales / Solutions Engineer",
+       "family": "Business, finance, sales and operations",
+       "catalogueFamily": "F",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "a9712065-85c0-49f2-b015-28d9453f6b5b",
+       "code": "B09",
+       "catalogueCode": "B09",
+       "title": "Technical Sales / Business Development Executive",
+       "family": "Business, finance, sales and operations",
+       "catalogueFamily": "F",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "0ea0e5f8-c411-4562-8cb0-7f930858df90",
+       "code": "B10",
+       "catalogueCode": "B10",
+       "title": "Digital Marketing Executive",
+       "family": "Business, finance, sales and operations",
+       "catalogueFamily": "F",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "dc44636b-cb88-4eda-9c2e-fd185f64f316",
+       "code": "CUSTOMER_SUCCESS",
+       "catalogueCode": "B11",
+       "title": "Customer Success Associate",
+       "family": "Business",
+       "catalogueFamily": "F",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "8ff05ac3-faff-40d8-9410-a3873e2a8470",
+       "code": "B12",
+       "catalogueCode": "B12",
+       "title": "HR Associate / Talent Acquisition",
+       "family": "Business, finance, sales and operations",
+       "catalogueFamily": "F",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "e6e49c1d-01d6-481d-bf9d-70fb990711e5",
+       "code": "B13",
+       "catalogueCode": "B13",
+       "title": "Supply Chain / Logistics Analyst",
+       "family": "Business, finance, sales and operations",
+       "catalogueFamily": "F",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "305b97c2-8ec1-4741-a3a1-e3ea336788dd",
+       "code": "B14",
+       "catalogueCode": "B14",
+       "title": "Procurement Analyst",
+       "family": "Business, finance, sales and operations",
+       "catalogueFamily": "F",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "abecb01e-95fa-495b-b987-1a1a0fad575b",
+       "code": "C02",
+       "catalogueCode": "C02",
+       "title": "Vulnerability Assessment Analyst (VAPT associate)",
+       "family": "Data, AI and cybersecurity",
+       "catalogueFamily": "B",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V2",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "ef2072c8-df24-469b-acc7-9a51792a8d22",
+       "code": "C03",
+       "catalogueCode": "C03",
+       "title": "Penetration Tester (junior)",
+       "family": "Data, AI and cybersecurity",
+       "catalogueFamily": "B",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "0d842da7-9ce6-419f-8209-615e78b0d740",
+       "code": "C04",
+       "catalogueCode": "C04",
+       "title": "GRC / IT Audit Analyst",
+       "family": "Data, AI and cybersecurity",
+       "catalogueFamily": "B",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "5a3c269f-7656-476e-8ab3-7192820b5c71",
+       "code": "C05",
+       "catalogueCode": "C05",
+       "title": "Application Security Analyst",
+       "family": "Data, AI and cybersecurity",
+       "catalogueFamily": "B",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "ef50b450-550a-4094-b90f-ca4291b3a877",
+       "code": "C06",
+       "catalogueCode": "C06",
+       "title": "Cloud Security Associate",
+       "family": "Data, AI and cybersecurity",
+       "catalogueFamily": "B",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "2e64176b-6bcf-4b84-9aa5-6d2b5cc1d5c7",
+       "code": "C07",
+       "catalogueCode": "C07",
+       "title": "IAM Analyst",
+       "family": "Data, AI and cybersecurity",
+       "catalogueFamily": "B",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "5911c771-6728-441c-8163-6adf2f2213b2",
+       "code": "C08",
+       "catalogueCode": "C08",
+       "title": "Digital Forensics Analyst (junior)",
+       "family": "Data, AI and cybersecurity",
+       "catalogueFamily": "B",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "0be1ad71-518a-4081-a55a-9720982215ca",
+       "code": "C09",
+       "catalogueCode": "C09",
+       "title": "OT / ICS Security Associate",
+       "family": "Data, AI and cybersecurity",
+       "catalogueFamily": "B",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "389cafa1-0295-4ccf-9eb7-0a82b88eabe5",
+       "code": "D02",
+       "catalogueCode": "D02",
+       "title": "BI Developer / Reporting Analyst",
+       "family": "Data, AI and cybersecurity",
+       "catalogueFamily": "B",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "30e68fca-5fb4-417d-9b46-7146a78d4309",
+       "code": "D03",
+       "catalogueCode": "D03",
+       "title": "MIS Executive",
+       "family": "Data, AI and cybersecurity",
+       "catalogueFamily": "B",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "a2b0cb1e-cf29-4ac9-b5b7-a0ae83003bde",
+       "code": "D04",
+       "catalogueCode": "D04",
+       "title": "Data Engineer (junior)",
+       "family": "Data, AI and cybersecurity",
+       "catalogueFamily": "B",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "d03e400e-1754-43ed-8c5d-5db884d16d5b",
+       "code": "D05",
+       "catalogueCode": "D05",
+       "title": "Data Scientist (entry)",
+       "family": "Data, AI and cybersecurity",
+       "catalogueFamily": "B",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "81caab25-27e8-4c72-951f-6304a9764f13",
+       "code": "D06",
+       "catalogueCode": "D06",
+       "title": "Machine Learning Engineer (junior)",
+       "family": "Data, AI and cybersecurity",
+       "catalogueFamily": "B",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "84d99474-ebc2-44c5-a62c-cf0ccc548ae0",
+       "code": "D07",
+       "catalogueCode": "D07",
+       "title": "GenAI / LLM Application Developer",
+       "family": "Data, AI and cybersecurity",
+       "catalogueFamily": "B",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "4e5604d9-2f60-4824-894b-07846c803d3a",
+       "code": "D08",
+       "catalogueCode": "D08",
+       "title": "AI Data Specialist / Annotation Analyst",
+       "family": "Data, AI and cybersecurity",
+       "catalogueFamily": "B",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "bb128c95-0615-4a89-b9a4-34565da03759",
+       "code": "D09",
+       "catalogueCode": "D09",
+       "title": "Computer Vision Engineer (junior)",
+       "family": "Data, AI and cybersecurity",
+       "catalogueFamily": "B",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "2e4d10ba-fbf3-4799-bf56-8bb80df1bdd2",
+       "code": "E01",
+       "catalogueCode": "E01",
+       "title": "Embedded Software Engineer",
+       "family": "Electronics, electrical and instrumentation",
+       "catalogueFamily": "C",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V2",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "4870071e-c5fa-4595-9369-3bc3021b5e7e",
+       "code": "E02",
+       "catalogueCode": "E02",
+       "title": "Embedded Hardware / PCB Design Engineer",
+       "family": "Electronics, electrical and instrumentation",
+       "catalogueFamily": "C",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "a80d5281-fb93-478e-8514-9afeded71668",
+       "code": "E03",
+       "catalogueCode": "E03",
+       "title": "VLSI Design Engineer (RTL)",
+       "family": "Electronics, electrical and instrumentation",
+       "catalogueFamily": "C",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "14ca1783-238c-453e-85ac-e97246a56756",
+       "code": "E04",
+       "catalogueCode": "E04",
+       "title": "VLSI Verification Engineer",
+       "family": "Electronics, electrical and instrumentation",
+       "catalogueFamily": "C",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "2e141846-9004-4ef8-b14e-c456a4a3058b",
+       "code": "E05",
+       "catalogueCode": "E05",
+       "title": "Physical Design Engineer",
+       "family": "Electronics, electrical and instrumentation",
+       "catalogueFamily": "C",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "4291b424-53d6-4d5d-919c-2e6c10b869c2",
+       "code": "E06",
+       "catalogueCode": "E06",
+       "title": "Analog / Mixed-Signal Design Engineer (junior)",
+       "family": "Electronics, electrical and instrumentation",
+       "catalogueFamily": "C",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "97117146-69e1-4a53-a032-77ef96bd1636",
+       "code": "E07",
+       "catalogueCode": "E07",
+       "title": "Telecom / RF Engineer",
+       "family": "Electronics, electrical and instrumentation",
+       "catalogueFamily": "C",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "4e19aad4-3e6e-4d29-9d5e-04ca94e14b6c",
+       "code": "E08",
+       "catalogueCode": "E08",
+       "title": "IoT Engineer",
+       "family": "Electronics, electrical and instrumentation",
+       "catalogueFamily": "C",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "1d1f024c-d2e3-4c9f-9b1d-98b7dedc456c",
+       "code": "E09",
+       "catalogueCode": "E09",
+       "title": "Electronics Test and Validation Engineer",
+       "family": "Electronics, electrical and instrumentation",
+       "catalogueFamily": "C",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "022c0ddd-1c67-4cfb-8438-55322bb665c7",
+       "code": "E10",
+       "catalogueCode": "E10",
+       "title": "Field Service Engineer (electronics / medical equipment)",
+       "family": "Electronics, electrical and instrumentation",
+       "catalogueFamily": "C",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "0247affc-4c3c-411a-a400-bb60ae2c7c40",
+       "code": "E11",
+       "catalogueCode": "E11",
+       "title": "Instrumentation and Control Engineer",
+       "family": "Electronics, electrical and instrumentation",
+       "catalogueFamily": "C",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "ab211f81-0659-4648-b27e-713d67f269a4",
+       "code": "E12",
+       "catalogueCode": "E12",
+       "title": "Automation Engineer (PLC / SCADA)",
+       "family": "Electronics, electrical and instrumentation",
+       "catalogueFamily": "C",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "f4459996-9551-4371-8cc8-58c7acad1064",
+       "code": "E13",
+       "catalogueCode": "E13",
+       "title": "Robotics Engineer (junior)",
+       "family": "Electronics, electrical and instrumentation",
+       "catalogueFamily": "C",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "1e1d114b-3a51-48a6-9306-83d2a2175ea4",
+       "code": "L01",
+       "catalogueCode": "L01",
+       "title": "Graduate Engineer Trainee — Electrical (power, utilities, PSUs)",
+       "family": "Electronics, electrical and instrumentation",
+       "catalogueFamily": "C",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V2",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "ef3bfd36-8c70-4d9d-bf47-72f02a0c808a",
+       "code": "L02",
+       "catalogueCode": "L02",
+       "title": "Electrical Design Engineer (buildings / MEP)",
+       "family": "Electronics, electrical and instrumentation",
+       "catalogueFamily": "C",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "7551416e-0c2d-40ca-99a2-3f06daa94133",
+       "code": "L03",
+       "catalogueCode": "L03",
+       "title": "Power Systems / Protection Engineer",
+       "family": "Electronics, electrical and instrumentation",
+       "catalogueFamily": "C",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "728e37b6-20e7-4d54-9217-e4c467768842",
+       "code": "L04",
+       "catalogueCode": "L04",
+       "title": "Electrical Maintenance Engineer (plant)",
+       "family": "Electronics, electrical and instrumentation",
+       "catalogueFamily": "C",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "d8e9279d-9ac7-4dbe-9a6c-82eef33b96ea",
+       "code": "L05",
+       "catalogueCode": "L05",
+       "title": "Renewable Energy Engineer (solar / wind)",
+       "family": "Electronics, electrical and instrumentation",
+       "catalogueFamily": "C",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "18dcaa07-f8ce-4026-a491-d9bc96aebafc",
+       "code": "L06",
+       "catalogueCode": "L06",
+       "title": "EV Powertrain / Battery Systems Engineer",
+       "family": "Electronics, electrical and instrumentation",
+       "catalogueFamily": "C",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "c9a72a0d-d5fc-4867-b0b2-9ac8a565c2a0",
+       "code": "L07",
+       "catalogueCode": "L07",
+       "title": "Electrical Site / Project Engineer",
+       "family": "Electronics, electrical and instrumentation",
+       "catalogueFamily": "C",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "1b9087f1-c2f2-4257-bc4a-0442852048c1",
+       "code": "M01",
+       "catalogueCode": "M01",
+       "title": "Graduate Engineer Trainee — Mechanical",
+       "family": "Mechanical, manufacturing, chemical and process",
+       "catalogueFamily": "D",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V2",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "28ada8e5-ed65-4b80-b966-00f5fdf3f7b2",
+       "code": "M02",
+       "catalogueCode": "M02",
+       "title": "Design Engineer (CAD)",
+       "family": "Mechanical, manufacturing, chemical and process",
+       "catalogueFamily": "D",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V2",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "c205ecd7-24eb-4a76-bd89-22da777d8dc7",
+       "code": "M03",
+       "catalogueCode": "M03",
+       "title": "CAE / Simulation Analyst (FEA / CFD)",
+       "family": "Mechanical, manufacturing, chemical and process",
+       "catalogueFamily": "D",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "08cb0479-38e9-4107-8286-cd3ba65b812a",
+       "code": "M04",
+       "catalogueCode": "M04",
+       "title": "Production / Manufacturing Engineer",
+       "family": "Mechanical, manufacturing, chemical and process",
+       "catalogueFamily": "D",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "14403823-d250-413e-8201-1b99fef05264",
+       "code": "M05",
+       "catalogueCode": "M05",
+       "title": "Quality Engineer (QA / QC)",
+       "family": "Mechanical, manufacturing, chemical and process",
+       "catalogueFamily": "D",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "089fd6ae-9ea1-44b6-a983-5ba04d1ce73e",
+       "code": "M06",
+       "catalogueCode": "M06",
+       "title": "Maintenance Engineer (mechanical)",
+       "family": "Mechanical, manufacturing, chemical and process",
+       "catalogueFamily": "D",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "31798333-f367-4495-b427-3a6c7352b804",
+       "code": "M07",
+       "catalogueCode": "M07",
+       "title": "Industrial / Process Improvement Engineer",
+       "family": "Mechanical, manufacturing, chemical and process",
+       "catalogueFamily": "D",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "dea1e169-f2c4-4d6e-a3f6-c605d419b0c3",
+       "code": "M08",
+       "catalogueCode": "M08",
+       "title": "HVAC Design Engineer (MEP)",
+       "family": "Mechanical, manufacturing, chemical and process",
+       "catalogueFamily": "D",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "b18bfa98-aa50-44e7-b20c-38536449cad2",
+       "code": "M09",
+       "catalogueCode": "M09",
+       "title": "Automotive Engineer (service / design)",
+       "family": "Mechanical, manufacturing, chemical and process",
+       "catalogueFamily": "D",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "178bc52d-5a1e-44e1-9a16-bfa2ec9c54b7",
+       "code": "M10",
+       "catalogueCode": "M10",
+       "title": "CNC Programmer / Tool Design Engineer",
+       "family": "Mechanical, manufacturing, chemical and process",
+       "catalogueFamily": "D",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "58c39bee-604f-484a-ab34-a1e8350a70a7",
+       "code": "M11",
+       "catalogueCode": "M11",
+       "title": "Aircraft Maintenance / MRO Engineer (trainee)",
+       "family": "Mechanical, manufacturing, chemical and process",
+       "catalogueFamily": "D",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "4efb4bde-3a0e-4090-80b7-f6f65c6e6954",
+       "code": "M12",
+       "catalogueCode": "M12",
+       "title": "Piping Design Engineer",
+       "family": "Mechanical, manufacturing, chemical and process",
+       "catalogueFamily": "D",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "c472c17c-4cac-4036-8db9-e773bfe5a671",
+       "code": "M13",
+       "catalogueCode": "M13",
+       "title": "Sourcing / Supply Chain Engineer",
+       "family": "Mechanical, manufacturing, chemical and process",
+       "catalogueFamily": "D",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "fe6c2569-d77d-495a-9631-5eaaf6aff5fe",
+       "code": "M14",
+       "catalogueCode": "M14",
+       "title": "Production Planning and Control (PPC) Engineer",
+       "family": "Mechanical, manufacturing, chemical and process",
+       "catalogueFamily": "D",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "66cab268-e74d-4826-ad3c-d876616cf94f",
+       "code": "P01",
+       "catalogueCode": "P01",
+       "title": "Process Engineer (chemical)",
+       "family": "Mechanical, manufacturing, chemical and process",
+       "catalogueFamily": "D",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "0b7bd7c7-7b88-47e4-8299-1e091466a942",
+       "code": "P02",
+       "catalogueCode": "P02",
+       "title": "Production / Plant Operations Engineer (chemical, pharma, FMCG)",
+       "family": "Mechanical, manufacturing, chemical and process",
+       "catalogueFamily": "D",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "2cc5342b-0a57-4cab-a7bb-01adf85527ae",
+       "code": "P03",
+       "catalogueCode": "P03",
+       "title": "QA / QC Analyst (pharma / chemical)",
+       "family": "Mechanical, manufacturing, chemical and process",
+       "catalogueFamily": "D",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "59f34e31-f033-451f-b124-43405db7b6e1",
+       "code": "P04",
+       "catalogueCode": "P04",
+       "title": "Process Safety / HSE Engineer",
+       "family": "Mechanical, manufacturing, chemical and process",
+       "catalogueFamily": "D",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "ccce4856-3c9d-40ac-924c-20be07387113",
+       "code": "P05",
+       "catalogueCode": "P05",
+       "title": "Bioprocess / Biotech Associate",
+       "family": "Mechanical, manufacturing, chemical and process",
+       "catalogueFamily": "D",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "48ec475c-81ab-4334-8578-9ebe686fd4de",
+       "code": "P06",
+       "catalogueCode": "P06",
+       "title": "Environmental Engineer (treatment plants)",
+       "family": "Mechanical, manufacturing, chemical and process",
+       "catalogueFamily": "D",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "dfcb14ed-25c8-4b79-9765-a659702dbd02",
+       "code": "S02",
+       "catalogueCode": "S02",
+       "title": "Software Developer (backend)",
+       "family": "Software, IT and product",
+       "catalogueFamily": "A",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V2",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "699e5b62-0fb8-43cd-99f8-a29289a72e0c",
+       "code": "S03",
+       "catalogueCode": "S03",
+       "title": "Frontend Developer",
+       "family": "Software, IT and product",
+       "catalogueFamily": "A",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "a11e47ab-016e-4ca4-8898-9f0b81a91486",
+       "code": "S04",
+       "catalogueCode": "S04",
+       "title": "Full-Stack Developer",
+       "family": "Software, IT and product",
+       "catalogueFamily": "A",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "c8f97ade-4c1c-4c60-a795-66637b15ce60",
+       "code": "S05",
+       "catalogueCode": "S05",
+       "title": "Mobile App Developer",
+       "family": "Software, IT and product",
+       "catalogueFamily": "A",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "67659990-c7b7-46ec-9673-082dcd5869eb",
+       "code": "S06",
+       "catalogueCode": "S06",
+       "title": "Software Test Engineer (manual QA)",
+       "family": "Software, IT and product",
+       "catalogueFamily": "A",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V2",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "4159f238-ffb0-4706-bea9-7bd4cf7ed77f",
+       "code": "S07",
+       "catalogueCode": "S07",
+       "title": "Test Automation Engineer (SDET)",
+       "family": "Software, IT and product",
+       "catalogueFamily": "A",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "917578d2-21b4-4d01-9e8d-f422faedcc09",
+       "code": "S08",
+       "catalogueCode": "S08",
+       "title": "DevOps Engineer (junior)",
+       "family": "Software, IT and product",
+       "catalogueFamily": "A",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "5b80a857-7250-45e3-83eb-ca7d87321015",
+       "code": "S09",
+       "catalogueCode": "S09",
+       "title": "Cloud Support / Associate Cloud Engineer",
+       "family": "Software, IT and product",
+       "catalogueFamily": "A",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "56193e4b-76b6-4401-bdf7-6ace4e56f017",
+       "code": "S10",
+       "catalogueCode": "S10",
+       "title": "Site Reliability Engineer (junior)",
+       "family": "Software, IT and product",
+       "catalogueFamily": "A",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "57340f44-67e7-44e3-80e6-3a9ef85c0d73",
+       "code": "S11",
+       "catalogueCode": "S11",
+       "title": "System Administrator (Linux / Windows)",
+       "family": "Software, IT and product",
+       "catalogueFamily": "A",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "46a45273-176b-45c9-b023-881d323f8bab",
+       "code": "S12",
+       "catalogueCode": "S12",
+       "title": "Network / NOC Engineer",
+       "family": "Software, IT and product",
+       "catalogueFamily": "A",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "c6322fea-1697-478d-9750-e26cbc15679a",
+       "code": "S13",
+       "catalogueCode": "S13",
+       "title": "Technical Support / IT Helpdesk Engineer",
+       "family": "Software, IT and product",
+       "catalogueFamily": "A",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V2",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "d75de28e-4b3b-4a70-81f5-397d510020af",
+       "code": "S14",
+       "catalogueCode": "S14",
+       "title": "Database Administrator / SQL Developer",
+       "family": "Software, IT and product",
+       "catalogueFamily": "A",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "7ff5c06e-3937-4800-be4a-5be034c452be",
+       "code": "S15",
+       "catalogueCode": "S15",
+       "title": "ERP / SAP Consultant (trainee)",
+       "family": "Software, IT and product",
+       "catalogueFamily": "A",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "8ba123eb-5a77-4e75-9040-110e257d574a",
+       "code": "S16",
+       "catalogueCode": "S16",
+       "title": "CRM / Salesforce Developer",
+       "family": "Software, IT and product",
+       "catalogueFamily": "A",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "68b1b13e-d365-45f8-9f15-c872cb2c173f",
+       "code": "S17",
+       "catalogueCode": "S17",
+       "title": "Mainframe Developer",
+       "family": "Software, IT and product",
+       "catalogueFamily": "A",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "915497e7-a1bc-4c1b-b81d-bc8f93f21cbd",
+       "code": "S18",
+       "catalogueCode": "S18",
+       "title": "Game Developer",
+       "family": "Software, IT and product",
+       "catalogueFamily": "A",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "8ff7bd5a-ee10-4de3-bd31-499390ee41ea",
+       "code": "S19",
+       "catalogueCode": "S19",
+       "title": "UI / UX Designer",
+       "family": "Software, IT and product",
+       "catalogueFamily": "A",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "9b084a76-9d1f-4931-badb-ccc5c4be420f",
+       "code": "S20",
+       "catalogueCode": "S20",
+       "title": "Technical Writer",
+       "family": "Software, IT and product",
+       "catalogueFamily": "A",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "e706c008-e74c-4cea-9339-e837962b6511",
+       "code": "BUSINESS_ANALYST",
+       "catalogueCode": "S21",
+       "title": "IT Business Analyst",
+       "family": "Business",
+       "catalogueFamily": "A",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "3aef94c7-6a01-4fc0-be15-27514cfbe398",
+       "code": "S22",
+       "catalogueCode": "S22",
+       "title": "Associate Product Manager / Product Analyst",
+       "family": "Software, IT and product",
+       "catalogueFamily": "A",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "064b3d16-2bd3-494f-9cd8-5a4af0dad9b5",
+       "code": "S23",
+       "catalogueCode": "S23",
+       "title": "IT Project Coordinator / Scrum Associate",
+       "family": "Software, IT and product",
+       "catalogueFamily": "A",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "c68c9e93-0e53-4566-b4a8-1ecd55cb8988",
+       "code": "S24",
+       "catalogueCode": "S24",
+       "title": "Blockchain Developer",
+       "family": "Software, IT and product",
+       "catalogueFamily": "A",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "69b8f3e4-bff6-471f-aaf0-9f201497f811",
+       "code": "S25",
+       "catalogueCode": "S25",
+       "title": "AR / VR Developer",
+       "family": "Software, IT and product",
+       "catalogueFamily": "A",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "6f21e680-a25e-43f1-8270-22d67196e340",
+       "code": "V01",
+       "catalogueCode": "V01",
+       "title": "Site Engineer / Graduate Engineer Trainee — Civil",
+       "family": "Civil and construction",
+       "catalogueFamily": "E",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V2",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "8582e3d6-c359-4fd1-981b-bb0fe8898460",
+       "code": "V02",
+       "catalogueCode": "V02",
+       "title": "Structural Design Engineer",
+       "family": "Civil and construction",
+       "catalogueFamily": "E",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "13a112eb-3b1b-43c7-b95c-8bcc0db019aa",
+       "code": "V03",
+       "catalogueCode": "V03",
+       "title": "Quantity Surveyor / Estimation and Billing Engineer",
+       "family": "Civil and construction",
+       "catalogueFamily": "E",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": "V3",
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "cdce8ebc-57f7-44e8-b0b6-00cd177ee389",
+       "code": "V04",
+       "catalogueCode": "V04",
+       "title": "Planning Engineer",
+       "family": "Civil and construction",
+       "catalogueFamily": "E",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "8d6836fb-9dcd-41c9-8b2f-855dac1f25a6",
+       "code": "V05",
+       "catalogueCode": "V05",
+       "title": "BIM Modeller / Engineer",
+       "family": "Civil and construction",
+       "catalogueFamily": "E",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "6fdb2007-4dff-40c9-90bc-fc4d247c124b",
+       "code": "V06",
+       "catalogueCode": "V06",
+       "title": "Highway / Transportation Engineer",
+       "family": "Civil and construction",
+       "catalogueFamily": "E",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "cf42e5dc-6435-46aa-beb6-43abd481fd27",
+       "code": "V07",
+       "catalogueCode": "V07",
+       "title": "Geotechnical Engineer (junior)",
+       "family": "Civil and construction",
+       "catalogueFamily": "E",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "62c7de53-bfb3-43b4-a26e-f5136bca03b9",
+       "code": "V08",
+       "catalogueCode": "V08",
+       "title": "Water Resources / Public Health Engineer",
+       "family": "Civil and construction",
+       "catalogueFamily": "E",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "4c43d64e-ad4f-42c6-b8ca-cfa815f6174a",
+       "code": "V09",
+       "catalogueCode": "V09",
+       "title": "Quality Control Engineer — Civil",
+       "family": "Civil and construction",
+       "catalogueFamily": "E",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "3f8e82e9-5df5-4efb-a68a-e6acb814c871",
+       "code": "V10",
+       "catalogueCode": "V10",
+       "title": "Surveyor / GIS Analyst",
+       "family": "Civil and construction",
+       "catalogueFamily": "E",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      },
+      {
+       "id": "66d19e38-1f09-404a-96c1-61eb531f41f6",
+       "code": "V11",
+       "catalogueCode": "V11",
+       "title": "MEP Coordinator",
+       "family": "Civil and construction",
+       "catalogueFamily": "E",
+       "releaseLabel": "SELECTABLE",
+       "plannedRelease": null,
+       "active": true,
+       "students": {
+        "suppressed": true,
+        "value": null
+       },
+       "colleges": null,
+       "promotion": {
+        "status": "NOT_MET",
+        "studentArmMet": false,
+        "employerArm": "NOT_RECORDED"
+       }
+      }
+     ],
+     "rolesCapped": false,
+     "byReleaseLabel": [
+      {
+       "releaseLabel": "SELECTABLE",
+       "label": "SELECTABLE",
+       "roles": 108,
+       "students": {
+        "suppressed": false,
+        "value": 30
+       },
+       "complementary": false
+      }
+     ],
+     "trend": [
+      {
+       "month": "2025-11",
+       "students": {
+        "suppressed": true,
+        "value": null
+       }
+      },
+      {
+       "month": "2025-12",
+       "students": {
+        "suppressed": true,
+        "value": null
+       }
+      },
+      {
+       "month": "2026-01",
+       "students": {
+        "suppressed": true,
+        "value": null
+       }
+      },
+      {
+       "month": "2026-02",
+       "students": {
+        "suppressed": true,
+        "value": null
+       }
+      },
+      {
+       "month": "2026-03",
+       "students": {
+        "suppressed": true,
+        "value": null
+       }
+      },
+      {
+       "month": "2026-04",
+       "students": {
+        "suppressed": true,
+        "value": null
+       }
+      },
+      {
+       "month": "2026-05",
+       "students": {
+        "suppressed": true,
+        "value": null
+       }
+      },
+      {
+       "month": "2026-06",
+       "students": {
+        "suppressed": true,
+        "value": null
+       }
+      },
+      {
+       "month": "2026-07",
+       "students": {
+        "suppressed": true,
+        "value": null
+       }
+      },
+      {
+       "month": "2026-08",
+       "students": {
+        "suppressed": true,
+        "value": null
+       }
+      },
+      {
+       "month": "2026-09",
+       "students": {
+        "suppressed": true,
+        "value": null
+       }
+      },
+      {
+       "month": "2026-10",
+       "students": {
+        "suppressed": false,
+        "value": 30
+       }
+      }
+     ],
+     "employerDemand": {
+      "available": false,
+      "reason": "NO_ROLE_MAPPING"
+     }
+    },
+    "promotionRule": {
+     "minimumStudents": 200,
+     "minimumColleges": 3,
+     "employerArm": "NOT_RECORDED"
+    },
+    "correlationId": "4c377249-f383-4861-9c9a-f97fff78893e"
+   }
+  },
+  "GET /api/v1/operations/analytics/colleges": {
+   "status": 200,
+   "body": {
+    "health": {
+     "generatedAt": "2026-10-08T11:48:32.857Z",
+     "windows": {
+      "weekStart": "2026-09-28",
+      "weekEnd": "2026-10-04",
+      "month": "2026-09",
+      "monthStart": "2026-09-01",
+      "monthEnd": "2026-09-30"
+     },
+     "colleges": [
+      {
+       "id": "8e246485-4565-48a9-9e69-de906633a082",
+       "name": "Lakeview Institute of Technology",
+       "verificationState": "VERIFIED",
+       "active": true,
+       "renewalDate": null,
+       "students": {
+        "total": {
+         "suppressed": true,
+         "value": null
+        },
+        "yes": {
+         "suppressed": false,
+         "value": 16
+        },
+        "no": {
+         "suppressed": true,
+         "value": null
+        }
+       },
+       "weeklyActiveLearners": {
+        "suppressed": true,
+        "value": null
+       },
+       "staff": {
+        "total": {
+         "suppressed": true,
+         "value": null
+        },
+        "yes": {
+         "suppressed": true,
+         "value": null
+        },
+        "no": {
+         "suppressed": true,
+         "value": null
+        }
+       },
+       "openSupportCases": 0,
+       "overdueSupportCases": 0
+      }
+     ],
+     "collegesCapped": false,
+     "totals": {
+      "colleges": 1,
+      "renewingWithin90Days": 0,
+      "withoutRenewalDate": 1,
+      "openSupportCases": 0
+     }
+    },
+    "correlationId": "d8fd03e0-6781-4208-b80b-e02708d7a0d2"
+   }
+  },
+  "GET /api/v1/operations/jobs/engine-health": {
+   "status": 200,
+   "body": {
+    "calibration": {
+     "status": "NO_RUN",
+     "expectedIntervalDays": 7,
+     "overdueAfterDays": 8,
+     "runsRecorded": 0,
+     "lastRun": null
+    },
+    "sandbox": {
+     "state": "NOT_BUILT",
+     "available": null,
+     "rejectedExecutions": null
+    },
+    "correlationId": "6aa25463-b631-45e2-8bc8-6fc5e4b15b43"
+   }
+  },
+  "GET /api/v1/operations/career-readiness/imports": {
+   "status": 200,
+   "body": [
+    {
+     "id": "b51a21a6-0cb0-4143-8b5a-ace61316646a",
+     "packageIdentity": "career-readiness-pilot-v1-29e1b8681f9c626cc2264169",
+     "sourceRepository": "https://github.com/PVUD14/planthepath-next",
+     "sourceCommit": "3d1a754b6d1eccb9a44249b0caed521a7df9ffd8",
+     "manifestHash": "29e1b8681f9c626cc226416950625b008216b59e247874187fa27ca22fb413bf",
+     "transformVersion": "career-readiness-pilot-v1",
+     "status": "STAGED",
+     "recordCounts": {
+      "topics": 2,
+      "lessons": 3,
+      "questions": 6
+     },
+     "startedAt": "2026-10-07T05:46:51.200Z",
+     "completedAt": "2026-10-07T05:46:51.200Z",
+     "blockedRecords": 0
+    },
+    {
+     "id": "23dc613f-bfbb-452f-904f-75b91f766f4a",
+     "packageIdentity": "v4-c431df464c7c586913acddc30cfe4a72",
+     "sourceRepository": "https://github.com/PVUD14/V4--Database",
+     "sourceCommit": "0c067ce24f92662daa933edf0fc8b75636d99469",
+     "manifestHash": "c431df464c7c586913acddc30cfe4a727f4e6b36c422c93a1711af54a8f521e3",
+     "transformVersion": "v4-question-registry-stage-v1",
+     "status": "STAGED",
+     "recordCounts": {
+      "discovered": 11,
+      "quarantined": 11,
+      "releaseEligible": 0
+     },
+     "startedAt": "2026-10-07T05:46:51.185Z",
+     "completedAt": "2026-10-07T05:46:51.185Z",
+     "blockedRecords": 11
+    }
+   ]
+  },
+  "GET /api/v1/operations/jobs/failed": {
+   "status": 200,
+   "body": {
+    "events": [
+     {
+      "eventId": "966022ee-da4a-48fb-8b52-745933105673",
+      "eventType": "notification.delivery.requested",
+      "eventVersion": 1,
+      "aggregateType": "notification_command",
+      "attempts": 5,
+      "failureClass": "TERMINAL_PUBLISH_FAILURE",
+      "occurredAt": "2026-10-07T11:48:39.877Z",
+      "failedAt": "2026-10-07T11:48:58.771Z",
+      "expiresAt": null,
+      "replayable": true
+     },
+     {
+      "eventId": "9ba3937c-e818-4979-b4b0-1f8cadc98dc5",
+      "eventType": "application.withdrawn",
+      "eventVersion": 1,
+      "aggregateType": "application",
+      "attempts": 1,
+      "failureClass": "SCHEMA_VALIDATION_FAILED",
+      "occurredAt": "2026-10-07T10:23:59.979Z",
+      "failedAt": "2026-10-07T10:24:00.626Z",
+      "expiresAt": null,
+      "replayable": true
+     },
+     {
+      "eventId": "3d75230b-97c4-412a-b3a6-efe5fd8fb6c0",
+      "eventType": "notification.delivery.requested",
+      "eventVersion": 1,
+      "aggregateType": "notification_command",
+      "attempts": 5,
+      "failureClass": "TERMINAL_PUBLISH_FAILURE",
+      "occurredAt": "2026-10-07T09:59:15.802Z",
+      "failedAt": "2026-10-07T09:59:35.207Z",
+      "expiresAt": null,
+      "replayable": true
+     }
+    ],
+    "nextCursor": null,
+    "correlationId": "35995f74-daa1-4525-b68f-e47d3a8a7faf"
+   }
+  },
+  "GET /api/v1/operations/career-readiness/status": {
+   "status": 200,
+   "body": {
+    "releases": [
+     {
+      "id": "25000000-0000-4000-8000-000000000001",
+      "name": "Career Readiness Fundamentals",
+      "version": 1,
+      "manifestHash": "29e1b8681f9c626cc226416950625b008216b59e247874187fa27ca22fb413bf",
+      "status": "PUBLISHED",
+      "publishedAt": "2026-10-07T05:46:51.200Z"
+     }
+    ],
+    "sourceGovernance": [
+     {
+      "rightsState": "APPROVED",
+      "smeState": "APPROVED",
+      "qualityState": "APPROVED",
+      "releaseState": "RELEASED",
+      "releaseEligible": true,
+      "count": 1
+     },
+     {
+      "rightsState": "PENDING",
+      "smeState": "PENDING",
+      "qualityState": "PENDING",
+      "releaseState": "QUARANTINED",
+      "releaseEligible": false,
+      "count": 11
+     }
+    ],
+    "reviewQueue": [],
+    "outboxFailures": [
+     {
+      "id": "966022ee-da4a-48fb-8b52-745933105673",
+      "eventType": "notification.delivery.requested",
+      "aggregateType": "notification_command",
+      "attempts": 5,
+      "failureClass": "TERMINAL_PUBLISH_FAILURE",
+      "correlationId": "f8b6d462-011a-4d95-8ff4-30f471774e45",
+      "occurredAt": "2026-10-07T11:48:39.877Z"
+     },
+     {
+      "id": "9ba3937c-e818-4979-b4b0-1f8cadc98dc5",
+      "eventType": "application.withdrawn",
+      "aggregateType": "application",
+      "attempts": 1,
+      "failureClass": "SCHEMA_VALIDATION_FAILED",
+      "correlationId": "c74ef084-1249-4d94-8d7f-4ee6de4ec06f",
+      "occurredAt": "2026-10-07T10:23:59.979Z"
+     },
+     {
+      "id": "3d75230b-97c4-412a-b3a6-efe5fd8fb6c0",
+      "eventType": "notification.delivery.requested",
+      "aggregateType": "notification_command",
+      "attempts": 5,
+      "failureClass": "TERMINAL_PUBLISH_FAILURE",
+      "correlationId": "4ef36d6b-0a89-4f4f-bb55-758e7f33314e",
+      "occurredAt": "2026-10-07T09:59:15.802Z"
+     }
+    ],
+    "workflows": [],
+    "automationCommands": []
+   }
+  },
+  "GET /api/v1/operations/jobs/summary": {
+   "status": 200,
+   "body": {
+    "summary": {
+     "generatedAt": "2026-10-08T11:48:33.751Z",
+     "outbox": {
+      "counts": {
+       "PENDING": {
+        "value": 0,
+        "capped": false
+       },
+       "PROCESSING": {
+        "value": 0,
+        "capped": false
+       },
+       "FAILED": {
+        "value": 3,
+        "capped": false
+       },
+       "PUBLISHED": {
+        "value": 112,
+        "capped": false
+       }
+      },
+      "oldestPendingAt": null,
+      "oldestDueWaitingSince": null,
+      "oldestDueWaitingMinutes": null,
+      "failedByType": [
+       {
+        "eventType": "notification.delivery.requested",
+        "count": 2
+       },
+       {
+        "eventType": "application.withdrawn",
+        "count": 1
+       }
+      ],
+      "failedByClass": [
+       {
+        "failureClass": "TERMINAL_PUBLISH_FAILURE",
+        "count": 2
+       },
+       {
+        "failureClass": "SCHEMA_VALIDATION_FAILED",
+        "count": 1
+       }
+      ]
+     },
+     "worker": {
+      "verdict": "NO_WORK_WAITING",
+      "lastDeliveredAt": "2026-10-07T11:48:40.668Z",
+      "activeLeases": {
+       "value": 0,
+       "capped": false
+      },
+      "expiredLeases": {
+       "value": 0,
+       "capped": false
+      }
+     },
+     "consumers": [
+      {
+       "name": "student-invitation-delivery",
+       "label": "Student invitation delivery",
+       "lastActivityAt": "2026-10-07T11:26:13.903Z",
+       "lastSucceededAt": "2026-10-07T11:26:13.903Z",
+       "failedReceipts": {
+        "value": 0,
+        "capped": false
+       },
+       "silenceMinutes": null,
+       "silent": null
+      },
+      {
+       "name": "learner-content-seeded-generation-v1",
+       "label": "Content generation (seeded drafts)",
+       "lastActivityAt": null,
+       "lastSucceededAt": null,
+       "failedReceipts": {
+        "value": 0,
+        "capped": false
+       },
+       "silenceMinutes": null,
+       "silent": null
+      },
+      {
+       "name": "learner-skill-state-projector",
+       "label": "Learner skill state projection",
+       "lastActivityAt": "2026-10-07T10:00:36.462Z",
+       "lastSucceededAt": "2026-10-07T10:00:36.462Z",
+       "failedReceipts": {
+        "value": 0,
+        "capped": false
+       },
+       "silenceMinutes": null,
+       "silent": null
+      },
+      {
+       "name": "tutor-hint-generator",
+       "label": "Tutor hints (AI)",
+       "lastActivityAt": null,
+       "lastSucceededAt": null,
+       "failedReceipts": {
+        "value": 0,
+        "capped": false
+       },
+       "silenceMinutes": null,
+       "silent": null
+      }
+     ],
+     "automation": {
+      "workflows": [],
+      "commandCounts": {
+       "PENDING": {
+        "value": 0,
+        "capped": false
+       },
+       "ACCEPTED": {
+        "value": 0,
+        "capped": false
+       },
+       "SUCCEEDED": {
+        "value": 0,
+        "capped": false
+       },
+       "FAILED_RETRYABLE": {
+        "value": 0,
+        "capped": false
+       },
+       "FAILED_TERMINAL": {
+        "value": 0,
+        "capped": false
+       },
+       "EXPIRED": {
+        "value": 0,
+        "capped": false
+       },
+       "CANCELLED": {
+        "value": 0,
+        "capped": false
+       }
+      },
+      "lastCommandAt": null,
+      "lastCallbackAt": null
+     },
+     "alerts": {
+      "config": {
+       "failedThreshold": 10,
+       "pendingStallMinutes": 30,
+       "consumerSilenceMinutes": {},
+       "ignored": []
+      },
+      "delivery": {
+       "workflowEnabled": false,
+       "templateApproved": false
+      },
+      "open": [],
+      "recent": []
+     }
+    },
+    "reasons": {
+     "replay": [
+      "TRANSIENT_FAILURE_RESOLVED",
+      "CONFIGURATION_FIXED",
+      "RECEIVER_RESTORED",
+      "INCIDENT_RECOVERY",
+      "CUSTOMER_REQUEST"
+     ],
+     "supersede": [
+      "PRE_DISPATCHER_BACKLOG",
+      "INCIDENT_CLEANUP"
+     ]
+    },
+    "correlationId": "b5ddbefb-43ca-45c5-ab92-af2e2d50b8a0"
+   }
+  },
+  "GET /api/v1/operations/audit-events": {
+   "status": 200,
+   "body": {
+    "events": [
+     {
+      "id": "17a57677-b72e-4ba3-9038-435682311afb",
+      "actorUserId": "cff9af74-5ba2-4252-8711-a491316ec660",
+      "action": "application.message_threads.viewed",
+      "resourceType": "organization",
+      "resourceId": "ea7073f5-6a18-4866-b126-09ff8a5d5256",
+      "organizationId": "ea7073f5-6a18-4866-b126-09ff8a5d5256",
+      "outcome": "SUCCESS",
+      "correlationId": "d43001aa-9400-465f-90a8-9dbe244d0912",
+      "occurredAt": "2026-10-08 11:48:16.810055+00",
+      "context": {
+       "threads": 0
+      }
+     },
+     {
+      "id": "614c2135-90bf-4420-b9cc-e254b4909b73",
+      "actorUserId": "cff9af74-5ba2-4252-8711-a491316ec660",
+      "action": "employer.reports.viewed",
+      "resourceType": "organization",
+      "resourceId": "ea7073f5-6a18-4866-b126-09ff8a5d5256",
+      "organizationId": "ea7073f5-6a18-4866-b126-09ff8a5d5256",
+      "outcome": "SUCCESS",
+      "correlationId": "46476a53-9ab9-455e-99eb-c3474f552211",
+      "occurredAt": "2026-10-08 11:48:15.131758+00",
+      "context": {
+       "jobs": 3,
+       "drives": 1
+      }
+     },
+     {
+      "id": "ef61fee2-1ee4-41d7-9d5b-da633723e28c",
+      "actorUserId": "ffe87cbc-89e0-4a38-b2d8-da34109e1650",
+      "action": "application.message_threads.viewed",
+      "resourceType": "organization",
+      "resourceId": "ea7073f5-6a18-4866-b126-09ff8a5d5256",
+      "organizationId": "ea7073f5-6a18-4866-b126-09ff8a5d5256",
+      "outcome": "SUCCESS",
+      "correlationId": "a90d5f20-8a61-40c0-bab9-a1f6e14a8b40",
+      "occurredAt": "2026-10-08 11:48:00.09329+00",
+      "context": {
+       "threads": 0
+      }
+     },
+     {
+      "id": "17665cb6-690a-43a1-b03e-6676741598b5",
+      "actorUserId": "ffe87cbc-89e0-4a38-b2d8-da34109e1650",
+      "action": "employer.reports.viewed",
+      "resourceType": "organization",
+      "resourceId": "ea7073f5-6a18-4866-b126-09ff8a5d5256",
+      "organizationId": "ea7073f5-6a18-4866-b126-09ff8a5d5256",
+      "outcome": "SUCCESS",
+      "correlationId": "dc0d886a-cf98-4832-b637-724a261aafaa",
+      "occurredAt": "2026-10-08 11:47:58.413927+00",
+      "context": {
+       "jobs": 3,
+       "drives": 1
+      }
+     },
+     {
+      "id": "5f271e1a-0457-474d-905a-edd6efcaf8ee",
+      "actorUserId": "7a23ce2a-b7cc-49cf-b0c9-0485596588ca",
+      "action": "institution.placement_applications.listed",
+      "resourceType": "institution",
+      "resourceId": "8e246485-4565-48a9-9e69-de906633a082",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "769536e7-9670-4b11-9dc3-84e3c4faecb2",
+      "occurredAt": "2026-10-08 11:47:41.388873+00",
+      "context": {
+       "page": "FIRST",
+       "unitId": null,
+       "returned": 0
+      }
+     },
+     {
+      "id": "c2247d7b-7660-4291-b428-93c2904f04f6",
+      "actorUserId": "7a23ce2a-b7cc-49cf-b0c9-0485596588ca",
+      "action": "counselling_note.cases_listed",
+      "resourceType": "institution",
+      "resourceId": "8e246485-4565-48a9-9e69-de906633a082",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "f0bf734e-6571-4916-8f52-06ce38a1cd6e",
+      "occurredAt": "2026-10-08 11:47:38.790266+00",
+      "context": {
+       "returned": 0,
+       "actorMembershipId": "d1ab29a4-3959-4680-9554-9b8af596494e"
+      }
+     },
+     {
+      "id": "13c97c78-e9ae-452d-9901-e070a9fc323e",
+      "actorUserId": "7a23ce2a-b7cc-49cf-b0c9-0485596588ca",
+      "action": "institution.preparation_sprints.read",
+      "resourceType": "institution",
+      "resourceId": "8e246485-4565-48a9-9e69-de906633a082",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "cd1c4e72-a44c-4d3f-b6e9-5ff9b66d59ea",
+      "occurredAt": "2026-10-08 11:47:37.016759+00",
+      "context": {
+       "roles": [
+        "DEPARTMENT_HEAD"
+       ],
+       "scope": "UNITS",
+       "returned": 0
+      }
+     },
+     {
+      "id": "a56b4172-1f40-4e5c-9df9-749002864712",
+      "actorUserId": "7a23ce2a-b7cc-49cf-b0c9-0485596588ca",
+      "action": "institution.placement_status.listed",
+      "resourceType": "institution",
+      "resourceId": "8e246485-4565-48a9-9e69-de906633a082",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "3a18fcbb-7e6c-4cba-ae9e-1fb4c89369a4",
+      "occurredAt": "2026-10-08 11:47:36.077981+00",
+      "context": {
+       "page": "FIRST",
+       "unitId": null,
+       "returned": 8
+      }
+     },
+     {
+      "id": "7150e0ae-f493-4a15-8635-6c0f357526a6",
+      "actorUserId": "3cda10c9-88a0-4930-a740-bb3fb545f68c",
+      "action": "counselling_note.cases_listed",
+      "resourceType": "institution",
+      "resourceId": "8e246485-4565-48a9-9e69-de906633a082",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "990ffabd-d497-4d6c-8f42-8b8d32f24823",
+      "occurredAt": "2026-10-08 11:47:23.554046+00",
+      "context": {
+       "returned": 0,
+       "actorMembershipId": "9eba1efc-28cc-4a6a-b1cb-2240ae9e1767"
+      }
+     },
+     {
+      "id": "fd47e5e3-4abf-464e-b95f-89e5dec3d570",
+      "actorUserId": "3cda10c9-88a0-4930-a740-bb3fb545f68c",
+      "action": "institution.learning_cohort.read",
+      "resourceType": "institution",
+      "resourceId": "8e246485-4565-48a9-9e69-de906633a082",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "008a78c8-7951-403c-994e-0c006e566db2",
+      "occurredAt": "2026-10-08 11:47:18.390136+00",
+      "context": {
+       "mode": "MEMBERSHIP",
+       "block": "SUMMARY",
+       "returned": 0,
+       "studentUserIds": []
+      }
+     },
+     {
+      "id": "7923a125-9bb4-4548-abe7-66ba577a36d3",
+      "actorUserId": "3cda10c9-88a0-4930-a740-bb3fb545f68c",
+      "action": "institution.learning_cohort.due_reviews_listed",
+      "resourceType": "institution",
+      "resourceId": "8e246485-4565-48a9-9e69-de906633a082",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "486b340c-b74f-4619-82f7-efc24ab48b4c",
+      "occurredAt": "2026-10-08 11:47:18.386467+00",
+      "context": {
+       "mode": "MEMBERSHIP",
+       "page": "FIRST",
+       "block": "DUE_REVIEWS",
+       "returned": 0,
+       "studentUserIds": []
+      }
+     },
+     {
+      "id": "606d7783-dfe5-420c-9995-091fc78cd18d",
+      "actorUserId": "ba70f3ea-0fdb-43bc-ab80-72a872c0468d",
+      "action": "institution.placement_status.listed",
+      "resourceType": "institution",
+      "resourceId": "8e246485-4565-48a9-9e69-de906633a082",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "6196ac8b-1d15-4603-ae3b-582390ff7a95",
+      "occurredAt": "2026-10-08 11:47:10.205393+00",
+      "context": {
+       "page": "FIRST",
+       "unitId": null,
+       "returned": 16
+      }
+     },
+     {
+      "id": "0c3d0702-372e-4559-a86b-1c0779ffd57f",
+      "actorUserId": "ba70f3ea-0fdb-43bc-ab80-72a872c0468d",
+      "action": "institution.preparation_sprints.read",
+      "resourceType": "institution",
+      "resourceId": "8e246485-4565-48a9-9e69-de906633a082",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "833ee97b-1652-4c9f-8688-464203c03a4c",
+      "occurredAt": "2026-10-08 11:47:09.337607+00",
+      "context": {
+       "roles": [
+        "INSTITUTION_ADMIN"
+       ],
+       "scope": "INSTITUTION",
+       "returned": 0
+      }
+     },
+     {
+      "id": "76490876-9319-4d83-a48a-38bd0d085b04",
+      "actorUserId": "ba70f3ea-0fdb-43bc-ab80-72a872c0468d",
+      "action": "counselling_note.cases_listed",
+      "resourceType": "institution",
+      "resourceId": "8e246485-4565-48a9-9e69-de906633a082",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "b30b50c5-d795-436f-9027-7743848fa32b",
+      "occurredAt": "2026-10-08 11:47:07.596431+00",
+      "context": {
+       "returned": 0,
+       "actorMembershipId": "50e0bb0b-d455-4362-afeb-5840d413adb9"
+      }
+     },
+     {
+      "id": "e971501a-24af-4c52-8c35-0ebf7f24bf5e",
+      "actorUserId": "ba70f3ea-0fdb-43bc-ab80-72a872c0468d",
+      "action": "institution.placement_status.listed",
+      "resourceType": "institution",
+      "resourceId": "8e246485-4565-48a9-9e69-de906633a082",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "11fc356e-9312-4d4c-8b93-f0a1873762da",
+      "occurredAt": "2026-10-08 11:47:05.018755+00",
+      "context": {
+       "page": "FIRST",
+       "unitId": null,
+       "returned": 16
+      }
+     },
+     {
+      "id": "03d5c309-9688-4e05-bae8-f0e35daf326d",
+      "actorUserId": "50a888bc-9e06-4bcc-9fc2-92eed07b4dd3",
+      "action": "institution.preparation_sprints.read",
+      "resourceType": "institution",
+      "resourceId": "8e246485-4565-48a9-9e69-de906633a082",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "6a54933c-b117-4ea6-974a-673a2ab38312",
+      "occurredAt": "2026-10-08 11:46:56.721002+00",
+      "context": {
+       "roles": [
+        "PLACEMENT_ADMIN"
+       ],
+       "scope": "INSTITUTION",
+       "returned": 0
+      }
+     },
+     {
+      "id": "b6e1d538-3146-4d31-9dd9-12b83aa94758",
+      "actorUserId": "50a888bc-9e06-4bcc-9fc2-92eed07b4dd3",
+      "action": "institution.placement_status.listed",
+      "resourceType": "institution",
+      "resourceId": "8e246485-4565-48a9-9e69-de906633a082",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "b2047e68-6735-4bae-96a1-e07606a0342f",
+      "occurredAt": "2026-10-08 11:46:55.830979+00",
+      "context": {
+       "page": "FIRST",
+       "unitId": null,
+       "returned": 16
+      }
+     },
+     {
+      "id": "0591c5c2-fa04-426b-bee8-0525e7c3015d",
+      "actorUserId": "50a888bc-9e06-4bcc-9fc2-92eed07b4dd3",
+      "action": "institution.placement_status.listed",
+      "resourceType": "institution",
+      "resourceId": "8e246485-4565-48a9-9e69-de906633a082",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "5f16405b-07e2-4d7d-a073-b59239e7098d",
+      "occurredAt": "2026-10-08 11:46:54.97661+00",
+      "context": {
+       "page": "FIRST",
+       "unitId": null,
+       "returned": 16
+      }
+     },
+     {
+      "id": "ac931810-2c96-4156-9f77-1537fadf3f64",
+      "actorUserId": "faf5035b-3cc7-4f94-8eb9-db52330e606b",
+      "action": "counselling_note.student_read",
+      "resourceType": "institution_student",
+      "resourceId": "faf5035b-3cc7-4f94-8eb9-db52330e606b",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "938b64bc-e32a-45e7-b59d-8d443e171917",
+      "occurredAt": "2026-10-08 11:46:29.044294+00",
+      "context": {
+       "returned": 0
+      }
+     },
+     {
+      "id": "f8f6cf9b-c0f1-4a37-ac95-a6c2f59dc461",
+      "actorUserId": "d8bc9a6c-bcc1-4a6d-bf1a-c892d07b6961",
+      "action": "counselling_note.student_read",
+      "resourceType": "institution_student",
+      "resourceId": "d8bc9a6c-bcc1-4a6d-bf1a-c892d07b6961",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "ff351db4-eace-4af8-a834-1ce0e75ffa8a",
+      "occurredAt": "2026-10-08 11:46:07.288729+00",
+      "context": {
+       "returned": 0
+      }
+     },
+     {
+      "id": "3e9b2862-1cc7-4aad-be6a-1f79eb9792d7",
+      "actorUserId": "d8bc9a6c-bcc1-4a6d-bf1a-c892d07b6961",
+      "action": "counselling_note.student_read",
+      "resourceType": "institution_student",
+      "resourceId": "d8bc9a6c-bcc1-4a6d-bf1a-c892d07b6961",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "98ce2fa0-cba9-4961-99f1-0202f52eda38",
+      "occurredAt": "2026-10-08 11:01:55.4301+00",
+      "context": {
+       "returned": 0
+      }
+     },
+     {
+      "id": "19faf026-409a-475f-8dc3-b489ea66f2b3",
+      "actorUserId": "d8bc9a6c-bcc1-4a6d-bf1a-c892d07b6961",
+      "action": "counselling_note.student_read",
+      "resourceType": "institution_student",
+      "resourceId": "d8bc9a6c-bcc1-4a6d-bf1a-c892d07b6961",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "41aa81d9-5708-4fa4-8d5b-9667baeecad4",
+      "occurredAt": "2026-10-08 10:27:14.448332+00",
+      "context": {
+       "returned": 0
+      }
+     },
+     {
+      "id": "e0fed83d-08c5-47e2-9e4f-3d417eed3c6c",
+      "actorUserId": "d8bc9a6c-bcc1-4a6d-bf1a-c892d07b6961",
+      "action": "counselling_note.student_read",
+      "resourceType": "institution_student",
+      "resourceId": "d8bc9a6c-bcc1-4a6d-bf1a-c892d07b6961",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "78fe9478-ac92-49e9-85f4-2aa8a83e5092",
+      "occurredAt": "2026-10-08 08:16:13.715976+00",
+      "context": {
+       "returned": 0
+      }
+     },
+     {
+      "id": "c68bb92c-8742-499a-9a5f-684cba2ffcc4",
+      "actorUserId": "cff9af74-5ba2-4252-8711-a491316ec660",
+      "action": "application.message_threads.viewed",
+      "resourceType": "organization",
+      "resourceId": "ea7073f5-6a18-4866-b126-09ff8a5d5256",
+      "organizationId": "ea7073f5-6a18-4866-b126-09ff8a5d5256",
+      "outcome": "SUCCESS",
+      "correlationId": "ae6fac73-63d9-4285-87ef-7c51e6144e8d",
+      "occurredAt": "2026-10-08 05:30:35.36553+00",
+      "context": {
+       "threads": 0
+      }
+     },
+     {
+      "id": "67d279cb-2bec-4b22-8dce-a7c33987ea63",
+      "actorUserId": "ffe87cbc-89e0-4a38-b2d8-da34109e1650",
+      "action": "application.message_threads.viewed",
+      "resourceType": "organization",
+      "resourceId": "ea7073f5-6a18-4866-b126-09ff8a5d5256",
+      "organizationId": "ea7073f5-6a18-4866-b126-09ff8a5d5256",
+      "outcome": "SUCCESS",
+      "correlationId": "73acaf73-0a69-44c2-9681-fe49e48d95b3",
+      "occurredAt": "2026-10-08 05:30:34.922672+00",
+      "context": {
+       "threads": 0
+      }
+     },
+     {
+      "id": "fbbee5cb-604f-4434-9501-428df70fbf07",
+      "actorUserId": "cff9af74-5ba2-4252-8711-a491316ec660",
+      "action": "employer.reports.viewed",
+      "resourceType": "organization",
+      "resourceId": "ea7073f5-6a18-4866-b126-09ff8a5d5256",
+      "organizationId": "ea7073f5-6a18-4866-b126-09ff8a5d5256",
+      "outcome": "SUCCESS",
+      "correlationId": "4966364e-9796-455b-ace6-9902b4ffd0a1",
+      "occurredAt": "2026-10-08 05:30:31.153476+00",
+      "context": {
+       "jobs": 3,
+       "drives": 1
+      }
+     },
+     {
+      "id": "c98bd028-46c7-4b20-9531-01dde06e2502",
+      "actorUserId": "ffe87cbc-89e0-4a38-b2d8-da34109e1650",
+      "action": "employer.reports.viewed",
+      "resourceType": "organization",
+      "resourceId": "ea7073f5-6a18-4866-b126-09ff8a5d5256",
+      "organizationId": "ea7073f5-6a18-4866-b126-09ff8a5d5256",
+      "outcome": "SUCCESS",
+      "correlationId": "bbe29c89-875a-4f46-8835-ea7add583580",
+      "occurredAt": "2026-10-08 05:30:30.903119+00",
+      "context": {
+       "jobs": 3,
+       "drives": 1
+      }
+     },
+     {
+      "id": "b05c087f-9e32-4a22-bbf0-d5db6ea9e4db",
+      "actorUserId": "d8bc9a6c-bcc1-4a6d-bf1a-c892d07b6961",
+      "action": "counselling_note.student_read",
+      "resourceType": "institution_student",
+      "resourceId": "d8bc9a6c-bcc1-4a6d-bf1a-c892d07b6961",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "a976403d-a067-4c49-9910-c951f8148ae6",
+      "occurredAt": "2026-10-08 05:30:08.90175+00",
+      "context": {
+       "returned": 0
+      }
+     },
+     {
+      "id": "f7debc80-e1e7-47d1-84f7-a81a248a1637",
+      "actorUserId": "d8bc9a6c-bcc1-4a6d-bf1a-c892d07b6961",
+      "action": "counselling_note.student_read",
+      "resourceType": "institution_student",
+      "resourceId": "d8bc9a6c-bcc1-4a6d-bf1a-c892d07b6961",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "071a38bb-804a-4e99-bd45-fa9c23aeb87e",
+      "occurredAt": "2026-10-08 05:30:05.901714+00",
+      "context": {
+       "returned": 0
+      }
+     },
+     {
+      "id": "d6318579-ee70-4e71-b8ca-66dca4266a9f",
+      "actorUserId": "ba70f3ea-0fdb-43bc-ab80-72a872c0468d",
+      "action": "institution.placement_status.listed",
+      "resourceType": "institution",
+      "resourceId": "8e246485-4565-48a9-9e69-de906633a082",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "c2fb5fb2-b00f-4b16-9678-85ea50c12718",
+      "occurredAt": "2026-10-08 05:29:28.926358+00",
+      "context": {
+       "page": "FIRST",
+       "unitId": null,
+       "returned": 16
+      }
+     },
+     {
+      "id": "abdfa16a-8a3c-4f19-903c-6ff7bd1c4c08",
+      "actorUserId": "7a23ce2a-b7cc-49cf-b0c9-0485596588ca",
+      "action": "institution.placement_applications.listed",
+      "resourceType": "institution",
+      "resourceId": "8e246485-4565-48a9-9e69-de906633a082",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "5681cd4f-955a-4d77-963b-51994ea5e17e",
+      "occurredAt": "2026-10-08 05:29:27.529587+00",
+      "context": {
+       "page": "FIRST",
+       "unitId": null,
+       "returned": 0
+      }
+     },
+     {
+      "id": "1e308bbd-e223-4749-ba33-33f465522725",
+      "actorUserId": "ba70f3ea-0fdb-43bc-ab80-72a872c0468d",
+      "action": "institution.preparation_sprints.read",
+      "resourceType": "institution",
+      "resourceId": "8e246485-4565-48a9-9e69-de906633a082",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "bb618354-56d7-45be-9c7b-4513733dc944",
+      "occurredAt": "2026-10-08 05:29:26.999655+00",
+      "context": {
+       "roles": [
+        "INSTITUTION_ADMIN"
+       ],
+       "scope": "INSTITUTION",
+       "returned": 0
+      }
+     },
+     {
+      "id": "c867eb83-df92-4870-8a73-deb7a8922754",
+      "actorUserId": "3cda10c9-88a0-4930-a740-bb3fb545f68c",
+      "action": "counselling_note.cases_listed",
+      "resourceType": "institution",
+      "resourceId": "8e246485-4565-48a9-9e69-de906633a082",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "364d3a70-8783-4f7f-bdc1-11ca9a558a83",
+      "occurredAt": "2026-10-08 05:29:24.428808+00",
+      "context": {
+       "returned": 0,
+       "actorMembershipId": "9eba1efc-28cc-4a6a-b1cb-2240ae9e1767"
+      }
+     },
+     {
+      "id": "2ab52cdb-2dab-4dd8-9a95-57d79edcd644",
+      "actorUserId": "ba70f3ea-0fdb-43bc-ab80-72a872c0468d",
+      "action": "counselling_note.cases_listed",
+      "resourceType": "institution",
+      "resourceId": "8e246485-4565-48a9-9e69-de906633a082",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "2501452d-6132-4773-aa05-3537194bc5e8",
+      "occurredAt": "2026-10-08 05:29:22.883755+00",
+      "context": {
+       "returned": 0,
+       "actorMembershipId": "50e0bb0b-d455-4362-afeb-5840d413adb9"
+      }
+     },
+     {
+      "id": "61c2ff53-1bdb-4034-8831-26e4c7d84681",
+      "actorUserId": "50a888bc-9e06-4bcc-9fc2-92eed07b4dd3",
+      "action": "institution.preparation_sprints.read",
+      "resourceType": "institution",
+      "resourceId": "8e246485-4565-48a9-9e69-de906633a082",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "03b309bd-88a3-49ef-9178-24f0708d20c2",
+      "occurredAt": "2026-10-08 05:29:22.317325+00",
+      "context": {
+       "roles": [
+        "PLACEMENT_ADMIN"
+       ],
+       "scope": "INSTITUTION",
+       "returned": 0
+      }
+     },
+     {
+      "id": "6f552cf6-3bf3-4380-a17b-4cd680083923",
+      "actorUserId": "7a23ce2a-b7cc-49cf-b0c9-0485596588ca",
+      "action": "counselling_note.cases_listed",
+      "resourceType": "institution",
+      "resourceId": "8e246485-4565-48a9-9e69-de906633a082",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "78db5ed8-5376-4d79-8939-fc4ec95ac1fe",
+      "occurredAt": "2026-10-08 05:29:21.662234+00",
+      "context": {
+       "returned": 0,
+       "actorMembershipId": "d1ab29a4-3959-4680-9554-9b8af596494e"
+      }
+     },
+     {
+      "id": "03285d2b-fd62-4e46-b0da-c48ef470eb9c",
+      "actorUserId": "50a888bc-9e06-4bcc-9fc2-92eed07b4dd3",
+      "action": "institution.placement_status.listed",
+      "resourceType": "institution",
+      "resourceId": "8e246485-4565-48a9-9e69-de906633a082",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "29ffea3b-a27c-4942-8b64-1c6303091126",
+      "occurredAt": "2026-10-08 05:29:17.904366+00",
+      "context": {
+       "page": "FIRST",
+       "unitId": null,
+       "returned": 16
+      }
+     },
+     {
+      "id": "4d2f4f8a-65d8-488e-ae23-321d29028665",
+      "actorUserId": "7a23ce2a-b7cc-49cf-b0c9-0485596588ca",
+      "action": "institution.preparation_sprints.read",
+      "resourceType": "institution",
+      "resourceId": "8e246485-4565-48a9-9e69-de906633a082",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "ee14ed48-617a-4875-913d-dc0eccd1c752",
+      "occurredAt": "2026-10-08 05:29:17.588687+00",
+      "context": {
+       "roles": [
+        "DEPARTMENT_HEAD"
+       ],
+       "scope": "UNITS",
+       "returned": 0
+      }
+     },
+     {
+      "id": "35df2684-ddc8-4c65-b02d-62e16a2c9212",
+      "actorUserId": "ba70f3ea-0fdb-43bc-ab80-72a872c0468d",
+      "action": "institution.placement_status.listed",
+      "resourceType": "institution",
+      "resourceId": "8e246485-4565-48a9-9e69-de906633a082",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "09b1ceca-6de2-4da1-8e6d-4720ec7b6f21",
+      "occurredAt": "2026-10-08 05:29:16.038116+00",
+      "context": {
+       "page": "FIRST",
+       "unitId": null,
+       "returned": 16
+      }
+     },
+     {
+      "id": "e5a2ef3e-0527-4310-a6a0-87a17f96b04b",
+      "actorUserId": "7a23ce2a-b7cc-49cf-b0c9-0485596588ca",
+      "action": "institution.placement_status.listed",
+      "resourceType": "institution",
+      "resourceId": "8e246485-4565-48a9-9e69-de906633a082",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "5413c6ca-2e57-42ef-82c7-42e76ca63d62",
+      "occurredAt": "2026-10-08 05:29:15.186176+00",
+      "context": {
+       "page": "FIRST",
+       "unitId": null,
+       "returned": 8
+      }
+     },
+     {
+      "id": "09be35c6-de3d-42ba-9271-dec0965e5d18",
+      "actorUserId": "3cda10c9-88a0-4930-a740-bb3fb545f68c",
+      "action": "institution.learning_cohort.due_reviews_listed",
+      "resourceType": "institution",
+      "resourceId": "8e246485-4565-48a9-9e69-de906633a082",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "4e873f0a-8e86-4a15-89ce-7c40c45d818c",
+      "occurredAt": "2026-10-08 05:29:13.266343+00",
+      "context": {
+       "mode": "MEMBERSHIP",
+       "page": "FIRST",
+       "block": "DUE_REVIEWS",
+       "returned": 0,
+       "studentUserIds": []
+      }
+     },
+     {
+      "id": "5ea72607-1799-499e-90b1-43196b737b38",
+      "actorUserId": "3cda10c9-88a0-4930-a740-bb3fb545f68c",
+      "action": "institution.learning_cohort.read",
+      "resourceType": "institution",
+      "resourceId": "8e246485-4565-48a9-9e69-de906633a082",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "f632b428-5e2b-4f83-b920-cd9522d2d320",
+      "occurredAt": "2026-10-08 05:29:13.233895+00",
+      "context": {
+       "mode": "MEMBERSHIP",
+       "block": "SUMMARY",
+       "returned": 0,
+       "studentUserIds": []
+      }
+     },
+     {
+      "id": "8164f0d8-1b86-4c26-918e-885fe35987b7",
+      "actorUserId": "faf5035b-3cc7-4f94-8eb9-db52330e606b",
+      "action": "counselling_note.student_read",
+      "resourceType": "institution_student",
+      "resourceId": "faf5035b-3cc7-4f94-8eb9-db52330e606b",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "e6e75aac-c3e2-4918-b1b1-44ae270a2e5a",
+      "occurredAt": "2026-10-08 05:29:05.152014+00",
+      "context": {
+       "returned": 0
+      }
+     },
+     {
+      "id": "72c93ff1-752d-4fea-a7bb-6c874ebf3c7b",
+      "actorUserId": "d8bc9a6c-bcc1-4a6d-bf1a-c892d07b6961",
+      "action": "counselling_note.student_read",
+      "resourceType": "institution_student",
+      "resourceId": "d8bc9a6c-bcc1-4a6d-bf1a-c892d07b6961",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "0732e842-1aab-466f-856a-392fafd885c1",
+      "occurredAt": "2026-10-08 05:28:03.871679+00",
+      "context": {
+       "returned": 0
+      }
+     },
+     {
+      "id": "a237191f-cdc2-4736-85a4-082015e34424",
+      "actorUserId": "d8bc9a6c-bcc1-4a6d-bf1a-c892d07b6961",
+      "action": "counselling_note.student_read",
+      "resourceType": "institution_student",
+      "resourceId": "d8bc9a6c-bcc1-4a6d-bf1a-c892d07b6961",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "11214c14-a7d8-43bd-bcdc-f05912758086",
+      "occurredAt": "2026-10-08 05:27:31.649191+00",
+      "context": {
+       "returned": 0
+      }
+     },
+     {
+      "id": "5f3a4a81-051d-4556-bb38-739102d8c4d9",
+      "actorUserId": "7a23ce2a-b7cc-49cf-b0c9-0485596588ca",
+      "action": "institution.placement_applications.listed",
+      "resourceType": "institution",
+      "resourceId": "8e246485-4565-48a9-9e69-de906633a082",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "76c094d8-76cd-4e2f-a49a-90675b9e3b57",
+      "occurredAt": "2026-10-08 05:00:18.899039+00",
+      "context": {
+       "page": "FIRST",
+       "unitId": null,
+       "returned": 0
+      }
+     },
+     {
+      "id": "03355ea1-9456-4855-9aac-918aa8412a83",
+      "actorUserId": "7a23ce2a-b7cc-49cf-b0c9-0485596588ca",
+      "action": "counselling_note.cases_listed",
+      "resourceType": "institution",
+      "resourceId": "8e246485-4565-48a9-9e69-de906633a082",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "cdd31cf3-26db-4f2e-ac1b-6ef49447bb97",
+      "occurredAt": "2026-10-08 04:48:58.29382+00",
+      "context": {
+       "returned": 0,
+       "actorMembershipId": "d1ab29a4-3959-4680-9554-9b8af596494e"
+      }
+     },
+     {
+      "id": "24b0c343-789a-4b70-b5f9-8111ddeed5d5",
+      "actorUserId": "7a23ce2a-b7cc-49cf-b0c9-0485596588ca",
+      "action": "institution.preparation_sprints.read",
+      "resourceType": "institution",
+      "resourceId": "8e246485-4565-48a9-9e69-de906633a082",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "05cd8c7d-6588-4990-adf3-f64cde158eab",
+      "occurredAt": "2026-10-08 04:30:23.178577+00",
+      "context": {
+       "roles": [
+        "DEPARTMENT_HEAD"
+       ],
+       "scope": "UNITS",
+       "returned": 0
+      }
+     },
+     {
+      "id": "b4e9130b-4f6b-4dac-93f0-f9aacbb92600",
+      "actorUserId": "7a23ce2a-b7cc-49cf-b0c9-0485596588ca",
+      "action": "institution.preparation_sprints.read",
+      "resourceType": "institution",
+      "resourceId": "8e246485-4565-48a9-9e69-de906633a082",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "95889126-843b-409d-8d33-595c930cb6ae",
+      "occurredAt": "2026-10-07 12:49:56.094618+00",
+      "context": {
+       "roles": [
+        "DEPARTMENT_HEAD"
+       ],
+       "scope": "UNITS",
+       "returned": 0
+      }
+     },
+     {
+      "id": "94b2237c-7f57-478b-a08c-9d0226d03a9f",
+      "actorUserId": "7a23ce2a-b7cc-49cf-b0c9-0485596588ca",
+      "action": "institution.placement_status.listed",
+      "resourceType": "institution",
+      "resourceId": "8e246485-4565-48a9-9e69-de906633a082",
+      "organizationId": "8e246485-4565-48a9-9e69-de906633a082",
+      "outcome": "SUCCESS",
+      "correlationId": "97192496-cae4-498a-bb43-845169859241",
+      "occurredAt": "2026-10-07 12:49:33.713959+00",
+      "context": {
+       "page": "FIRST",
+       "unitId": null,
+       "returned": 8
+      }
+     }
+    ],
+    "nextCursor": "MjAyNi0xMC0wNyAxMjo0OTozMy43MTM5NTkrMDB8OTRiMjIzN2MtN2Y1Ny00NzhiLWEwOGMtOWQwMjI2ZDAzYTlm",
+    "correlationId": "20855b8e-65fe-49df-b1b4-ddce2b5cf23f"
+   }
+  },
+  "GET /api/v1/operations/privacy/consents": {
+   "status": 200,
+   "body": {
+    "keys": [
+     {
+      "consentKey": "adaptive-learning",
+      "status": "NOT_PUBLISHED",
+      "liveVersion": null,
+      "title": null,
+      "enforcement": null,
+      "counts": null
+     },
+     {
+      "consentKey": "ai-tutoring",
+      "status": "NOT_PUBLISHED",
+      "liveVersion": null,
+      "title": null,
+      "enforcement": null,
+      "counts": null
+     },
+     {
+      "consentKey": "employer-discovery",
+      "status": "LIVE",
+      "liveVersion": "2026-10-draft",
+      "title": "Let verified employers find me in the talent pool",
+      "enforcement": "OPTIONAL",
+      "counts": {
+       "consentedToLiveVersion": {
+        "suppressed": true,
+        "value": null
+       },
+       "withdrawn": {
+        "suppressed": true,
+        "value": null
+       },
+       "onOlderVersion": {
+        "suppressed": true,
+        "value": null
+       }
+      }
+     },
+     {
+      "consentKey": "model-improvement",
+      "status": "NOT_PUBLISHED",
+      "liveVersion": null,
+      "title": null,
+      "enforcement": null,
+      "counts": null
+     }
+    ],
+    "definitions": [
+     {
+      "consentKey": "employer-discovery",
+      "version": "2026-10-draft",
+      "title": "Let verified employers find me in the talent pool",
+      "enforcement": "OPTIONAL",
+      "withdrawable": true,
+      "documentRef": "docs/legal/employer-discovery-consent-DRAFT-for-legal-review.md",
+      "effectiveFrom": "2026-10-07T05:46:50.236Z",
+      "retiredAt": null,
+      "status": "LIVE"
+     }
+    ],
+    "suppressionThreshold": 5,
+    "correlationId": "7e761f66-71dc-48e4-a4d0-56cb95014431"
+   }
+  },
+  "GET /api/v1/operations/privacy/holds": {
+   "status": 200,
+   "body": {
+    "holds": [],
+    "capped": false,
+    "reasons": {
+     "place": [
+      "LEGAL_OBLIGATION",
+      "SAFETY_INVESTIGATION",
+      "EMPLOYER_ACCOUNTABILITY_CASE",
+      "DISPUTE",
+      "REGULATORY_REQUEST"
+     ],
+     "release": [
+      "OBLIGATION_ENDED",
+      "CASE_CLOSED",
+      "ENTERED_IN_ERROR"
+     ]
+    },
+    "correlationId": "6aaa5ee1-c550-46c2-a671-9b8c328672a5"
+   }
+  },
+  "GET /api/v1/operations/privacy/growth-contacts/policy": {
+   "status": 200,
+   "body": {
+    "keys": [
+     "email",
+     "phone"
+    ],
+    "referencePattern": "^[A-Za-z0-9_:-]{3,64}$",
+    "retentionMonths": 24,
+    "correlationId": "61656414-0eb9-422f-b358-3cee4997eb1b"
+   }
+  },
+  "GET /api/v1/operations/privacy/requests?view=OPEN": {
+   "status": 200,
+   "body": {
+    "requests": [],
+    "nextCursor": null,
+    "summary": {
+     "open": {
+      "EXPORT": 0,
+      "DELETION": 0
+     },
+     "deletionsDueWithinSevenDays": 0,
+     "deletionsPastSchedule": 0,
+     "failed": 0,
+     "activeHolds": 0,
+     "releasesInFlight": 0
+    },
+    "policy": {
+     "deletionGracePeriodDays": 30,
+     "statutoryResponsePeriodDays": {
+      "EXPORT": null,
+      "DELETION": null
+     }
+    },
+    "correlationId": "37546ba6-922a-474a-a233-bfb091b3509d"
+   }
+  },
+  "GET /api/v1/operations/feature-flags": {
+   "status": 200,
+   "body": {
+    "flags": [
+     {
+      "key": "ai.assistant",
+      "description": "In-app ONE Assistant. It answers only when this is on, ASSISTANT_ENABLED=true on the server, a provider key is set and the kill switch is not engaged.",
+      "enabled": false,
+      "cap": null,
+      "overrides": 0,
+      "lastChangedAt": null,
+      "highRiskDirection": "ENABLE"
+     },
+     {
+      "key": "ai.global-kill-switch",
+      "description": "Global AI kill switch. On means every AI feature and the in-app assistant are stopped. Releasing it needs a second person.",
+      "enabled": false,
+      "cap": null,
+      "overrides": 0,
+      "lastChangedAt": null,
+      "highRiskDirection": "DISABLE"
+     },
+     {
+      "key": "career-catalogue.selectable-roles",
+      "description": "Offer students the full job-role catalogue (108 roles, each labelled with its release status). Off: only the starter roles are offered.",
+      "enabled": false,
+      "cap": null,
+      "overrides": 0,
+      "lastChangedAt": null,
+      "highRiskDirection": null
+     },
+     {
+      "key": "employer-access.allow-free-mail",
+      "description": "Accept employer access requests from public webmail addresses (flagged for review). Off: a work email is required.",
+      "enabled": false,
+      "cap": null,
+      "overrides": 0,
+      "lastChangedAt": null,
+      "highRiskDirection": null
+     },
+     {
+      "key": "employer.skill-evidence",
+      "description": "Let students share verified per-skill evidence with an employer for one application, and let that employer read it (ADR-043, hard gate HG-4). Off: nothing is offered or shown.",
+      "enabled": false,
+      "cap": null,
+      "overrides": 0,
+      "lastChangedAt": null,
+      "highRiskDirection": "ENABLE"
+     },
+     {
+      "key": "employer.talent-pool",
+      "description": "Let students opt in to be found by verified employers, and let those employers search the talent pool and invite them to apply (ADR-044, hard gate HG-4; consent wording HG-6). Off: nothing is offered or shown.",
+      "enabled": false,
+      "cap": null,
+      "overrides": 0,
+      "lastChangedAt": null,
+      "highRiskDirection": "ENABLE"
+     }
+    ]
+   }
+  },
+  "GET /api/v1/operations/support/cases?view=ACTIVE": {
+   "status": 200,
+   "body": {
+    "cases": [],
+    "nextCursor": null,
+    "summary": {
+     "open": 0,
+     "inProgress": 0,
+     "waitingOnCustomer": 0,
+     "overdue": 0,
+     "unassigned": 0,
+     "mine": 0
+    },
+    "correlationId": "d09e30a5-b041-4357-b36c-b14c0c684d80"
+   }
+  },
+  "GET /api/v1/operations/communications/templates": {
+   "status": 200,
+   "body": {
+    "templates": [],
+    "nextCursor": null,
+    "correlationId": "7a047112-5c59-477f-be2a-25e9f0473108"
+   }
+  },
+  "GET /api/v1/operations/communications/notices": {
+   "status": 200,
+   "body": {
+    "notices": [],
+    "nextCursor": null,
+    "correlationId": "4f45e5da-3d78-4ffd-b426-847629f4c879"
+   }
+  },
+  "GET /api/v1/operations/communications/policy": {
+   "status": 200,
+   "body": {
+    "reasons": {
+     "templateDraft": [
+      "NEW_TEMPLATE",
+      "WORDING_UPDATE",
+      "CORRECTION"
+     ],
+     "templatePublish": [
+      "INCIDENT_COMMUNICATION",
+      "PLANNED_COMMUNICATION",
+      "WORDING_CORRECTION"
+     ],
+     "templateWithdraw": [
+      "SUPERSEDED",
+      "ENTERED_IN_ERROR",
+      "NOT_NEEDED"
+     ],
+     "noticeDraft": [
+      "INITIAL_NOTICE",
+      "INCIDENT_UPDATE",
+      "RESOLUTION_NOTICE"
+     ],
+     "noticeApprove": [
+      "APPROVED_FOR_SEND"
+     ],
+     "noticeWithdraw": [
+      "NOT_NEEDED",
+      "WRONG_TEMPLATE",
+      "SUPERSEDED"
+     ]
+    },
+    "rateLimit": {
+     "minimumSpacingMinutes": 15,
+     "dailyLimit": 6
+    },
+    "approverCount": 0,
+    "soloSafeguardActive": false,
+    "noticeApproverCount": 4,
+    "noticeSoloSafeguardActive": false,
+    "soloCoolingOffMinutes": 15,
+    "incidents": [],
+    "correlationId": "83c41479-f365-41c7-9ee4-1def9ddbf86d"
+   }
+  },
+  "GET /api/v1/operations/approvals?state=PENDING": {
+   "status": 200,
+   "body": {
+    "approvals": [],
+    "nextCursor": null,
+    "decisionReasons": {
+     "APPROVE": [
+      "VERIFIED_NEED",
+      "POLICY_REQUIREMENT",
+      "INCIDENT_RESPONSE",
+      "CUSTOMER_REQUEST"
+     ],
+     "REJECT": [
+      "INSUFFICIENT_JUSTIFICATION",
+      "WRONG_TARGET",
+      "NOT_NEEDED",
+      "NEEDS_MORE_INFORMATION"
+     ]
+    },
+    "approverCount": 0,
+    "soloSafeguardActive": false,
+    "viewerIsApprover": false,
+    "correlationId": "d7c72a54-1573-4c86-890f-cb431c41d4d8"
+   }
+  }
+ }
+}

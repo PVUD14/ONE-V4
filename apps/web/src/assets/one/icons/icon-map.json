@@ -1,0 +1,223 @@
+{
+  "$schema": "portal -> nav label -> icon name (files: svg/<name>.svg, animated/<name>.svg, sprite.svg#i-<name>)",
+  "portals": {
+    "student": {
+      "title": "Student & Graduate",
+      "roles": [
+        "student",
+        "graduate"
+      ],
+      "nav": {
+        "Home": "home",
+        "My Career": "career",
+        "AI Career Coach": "coach",
+        "Career Tools": "tools",
+        "Readiness": "readiness",
+        "Skills": "skills",
+        "Assessments": "assessments",
+        "Learning": "learning",
+        "Practice": "practice",
+        "Company Prep": "company",
+        "Experience": "experience",
+        "Opportunities": "opportunities",
+        "Applications": "applications",
+        "Interviews": "interviews",
+        "Calendar": "calendar",
+        "Scholarships": "scholarships",
+        "Resume Builder": "resume",
+        "Documents": "documents",
+        "Profile": "profile",
+        "Settings": "settings",
+        "Help & FAQ": "help"
+      }
+    },
+    "placement": {
+      "title": "Placement Officer",
+      "roles": [
+        "placement"
+      ],
+      "nav": {
+        "Dashboard": "home",
+        "Assessments": "assessments",
+        "Students": "students",
+        "Student Search": "student-search",
+        "Readiness": "readiness",
+        "Departments": "departments",
+        "Batches": "batches",
+        "Help & FAQ": "help"
+      }
+    },
+    "institution-admin": {
+      "title": "Institution Admin",
+      "roles": [
+        "institution-admin"
+      ],
+      "nav": {
+        "Dashboard": "home",
+        "Students": "students",
+        "Student Detail": "students",
+        "Academic Structure": "academic-structure",
+        "Assessments": "assessments",
+        "Interventions": "interventions",
+        "Staff": "staff",
+        "Career Readiness": "readiness",
+        "Placement": "placement",
+        "Reports": "reports",
+        "Settings": "settings",
+        "Help & FAQ": "help"
+      }
+    },
+    "lecturer": {
+      "title": "Lecturer (Faculty)",
+      "roles": [
+        "lecturer"
+      ],
+      "nav": {
+        "Dashboard": "home",
+        "My Students": "students",
+        "Student Detail": "students",
+        "Academic Verification": "verification",
+        "Assessments": "assessments",
+        "Assessment Detail": "assessments",
+        "Assigned Tasks": "tasks",
+        "Interventions": "interventions",
+        "Learning Resources": "resources",
+        "Reports": "reports",
+        "Calendar": "calendar",
+        "Messages": "messages",
+        "Profile": "profile",
+        "Settings": "settings",
+        "Help & FAQ": "help"
+      }
+    },
+    "department-head": {
+      "title": "Department Head",
+      "roles": [
+        "department-head"
+      ],
+      "nav": {
+        "Dashboard": "home",
+        "Department Overview": "departments",
+        "Students": "students",
+        "Readiness": "readiness",
+        "Assessments": "assessments",
+        "Interventions": "interventions",
+        "Faculty and Staff": "staff",
+        "Placement Pipeline": "pipeline",
+        "Opportunities and Offers": "opportunities",
+        "Batches": "batches",
+        "Meetings": "meetings",
+        "Reports and Analytics": "reports",
+        "Settings": "settings",
+        "Help & FAQ": "help"
+      }
+    },
+    "employer": {
+      "title": "Employer (Recruiter & Owner)",
+      "roles": [
+        "employer",
+        "employer-owner"
+      ],
+      "nav": {
+        "Dashboard": "home",
+        "Opportunities": "opportunities",
+        "Opportunity Detail": "opportunities",
+        "Applicants": "applicants",
+        "Candidate Detail": "applicants",
+        "Assessments": "assessments",
+        "Interviews": "interviews",
+        "Talent Pool": "talent-pool",
+        "Offers": "offers",
+        "Reports": "reports",
+        "Team": "team",
+        "Messages": "messages",
+        "Company Profile": "company",
+        "Settings": "settings",
+        "Help & FAQ": "help"
+      }
+    },
+    "operations": {
+      "title": "Operations (platform admin)",
+      "roles": [
+        "operations"
+      ],
+      "nav": {
+        "Overview": "home",
+        "Organizations": "organizations",
+        "Organization Detail": "organizations",
+        "Users": "users",
+        "User Detail": "users",
+        "Verification": "verification",
+        "Trust and Safety": "trust-safety",
+        "AI Operations": "ai-operations",
+        "Subscriptions": "subscriptions",
+        "Billing": "billing",
+        "Analytics": "analytics",
+        "System Health": "system-health",
+        "Audit Logs": "audit-logs",
+        "Security": "security",
+        "Feature Flags": "feature-flags",
+        "Support": "support",
+        "Settings": "settings"
+      }
+    },
+    "growth": {
+      "title": "Growth (sales)",
+      "roles": [
+        "growth"
+      ],
+      "nav": {
+        "Home": "home",
+        "Leads": "leads",
+        "Field": "field",
+        "Territory": "territory",
+        "Targets": "targets",
+        "Commission": "commission"
+      }
+    }
+  },
+  "shared": {
+    "Evidence / Verified (chips, records)": "evidence"
+  },
+  "utility": {
+    "Search": "search",
+    "Notifications": "bell",
+    "Message": "message",
+    "Add": "plus",
+    "Close": "close",
+    "Check": "check",
+    "Chevron up": "chevron-up",
+    "Chevron down": "chevron-down",
+    "Chevron left": "chevron-left",
+    "Chevron right": "chevron-right",
+    "Arrow right": "arrow-right",
+    "External link": "external-link",
+    "Menu": "menu",
+    "More": "more-horizontal",
+    "Filter": "filter",
+    "Sort": "sort",
+    "Download": "download",
+    "Upload": "upload",
+    "Edit": "edit",
+    "Delete": "trash",
+    "Copy": "copy",
+    "Show": "eye",
+    "Hide": "eye-off",
+    "Locked": "lock",
+    "Unlocked": "unlock",
+    "Info": "info",
+    "Warning": "warning",
+    "Error": "error",
+    "Help": "help-small",
+    "Date": "calendar-small",
+    "Time": "clock",
+    "Link": "link",
+    "Sign out": "logout",
+    "Switch workspace": "switch-workspace",
+    "Collapse rail": "collapse-rail",
+    "Light mode": "sun",
+    "Dark mode": "moon",
+    "Refresh": "refresh",
+    "Settings": "settings-small"
+  }
+}

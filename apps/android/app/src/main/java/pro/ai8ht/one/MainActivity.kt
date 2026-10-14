@@ -11,6 +11,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,12 +24,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -57,13 +63,13 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -81,7 +87,11 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
-import pro.ai8ht.one.ui.BrandWordmark
+import pro.ai8ht.one.data.valueOrNull
+import pro.ai8ht.one.ui.BrandLogo
+import pro.ai8ht.one.ui.BrandMark
+import pro.ai8ht.one.ui.LogoSurface
+import pro.ai8ht.one.ui.logoSurfaceFor
 import pro.ai8ht.one.ui.OneBlue
 import pro.ai8ht.one.ui.OneBlueDeep
 import pro.ai8ht.one.ui.OneTheme
@@ -89,22 +99,47 @@ import pro.ai8ht.one.ui.Tone
 import java.time.Instant
 
 class MainActivity : ComponentActivity() {
+    /**
+     * Set when the OAuth redirect brings us back, and read once by the sign-in screen.
+     *
+     * The activity is `singleTask`, so a redirect while the app is already running
+     * arrives at [onNewIntent] rather than a fresh instance — both paths funnel here.
+     */
+    private val pendingRedirect = androidx.compose.runtime.mutableStateOf<android.net.Uri?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        captureRedirect(intent)
         setContent {
             val context = androidx.compose.ui.platform.LocalContext.current
             var themeId by remember { mutableStateOf(Session.theme(context)) }
             OneTheme(themeId) {
-                OneApp(currentTheme = themeId, onThemeChange = { id ->
-                    themeId = id
-                    Session.setTheme(context, id)
-                })
+                OneApp(
+                    currentTheme = themeId,
+                    onThemeChange = { id ->
+                        themeId = id
+                        Session.setTheme(context, id)
+                    },
+                    oauthRedirect = pendingRedirect.value,
+                    onRedirectHandled = { pendingRedirect.value = null },
+                )
             }
         }
     }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        captureRedirect(intent)
+    }
+
+    private fun captureRedirect(intent: android.content.Intent?) {
+        val data = intent?.data ?: return
+        if (data.scheme == "one.ai8ht.pro" && data.host == "signin") pendingRedirect.value = data
+    }
 }
 
-private enum class Screen(val title: String, val subtitle: String) {
+internal enum class Screen(val title: String, val subtitle: String) {
     Home("Home", "Your day at a glance"),
     Assessments("Assessments", "Assigned tests, windows and your results"),
     Learning("Learning", "Modules, lessons and your progress"),
@@ -112,11 +147,12 @@ private enum class Screen(val title: String, val subtitle: String) {
     More("Profile", "Your account, documents and privacy"),
 }
 
-private class StudentData(
+internal class StudentData(
     val student: StudentDto?,
     val assessments: List<AssessmentDto>,
     val learner: LearnerStateDto?,
     val notifications: NotificationsEnvelope?,
+    val activity: StudentActivityDto? = null,
 )
 
 private fun parseWorkspace(raw: String?): Workspace? {
@@ -130,20 +166,38 @@ private fun parseWorkspace(raw: String?): Workspace? {
 private fun encodeWorkspace(ws: Workspace): String = "${ws.kind.name}|${ws.organizationId ?: ""}|${ws.role}"
 
 @Composable
-fun OneApp(currentTheme: String, onThemeChange: (String) -> Unit) {
+fun OneApp(
+    currentTheme: String,
+    onThemeChange: (String) -> Unit,
+    oauthRedirect: android.net.Uri? = null,
+    onRedirectHandled: () -> Unit = {},
+) {
     val context = LocalContext.current
     var signedIn by remember { mutableStateOf(Session.token(context) != null) }
     var sessionExpired by remember { mutableStateOf(false) }
     var consent by remember { mutableStateOf<ConsentStatusDto?>(null) }
     var consentChecked by remember { mutableStateOf(false) }
+    // Fails closed (ENG-01): a check that could not be answered is not consent.
+    var consentUnavailable by remember { mutableStateOf(false) }
+    var consentAttempt by remember { mutableStateOf(0) }
     var workspace by remember { mutableStateOf(parseWorkspace(Session.workspace(context))) }
     var workspaceOptions by remember { mutableStateOf<List<Workspace>?>(null) }
     var multiWorkspace by remember { mutableStateOf(false) }
 
-    LaunchedEffect(signedIn) {
+    LaunchedEffect(signedIn, consentAttempt) {
         if (signedIn) {
-            consent = runCatching { Api.consentStatus(context) }.getOrNull()
-            consentChecked = true
+            runCatching { Api.consentStatus(context) }
+                .onSuccess { consent = it; consentUnavailable = false; consentChecked = true }
+                .onFailure { failure ->
+                    if (failure is Api.ApiException && failure.status == 401) {
+                        Session.clear(context)
+                        workspace = null
+                        sessionExpired = true
+                        signedIn = false
+                    } else {
+                        consentUnavailable = true
+                    }
+                }
         }
     }
 
@@ -164,7 +218,13 @@ fun OneApp(currentTheme: String, onThemeChange: (String) -> Unit) {
     }
 
     when {
-        !signedIn -> SignInScreen(expired = sessionExpired, onSignedIn = { sessionExpired = false; signedIn = true; consentChecked = false })
+        !signedIn -> SignInScreen(
+            expired = sessionExpired,
+            oauthRedirect = oauthRedirect,
+            onRedirectHandled = onRedirectHandled,
+            onSignedIn = { sessionExpired = false; signedIn = true; consentChecked = false },
+        )
+        consentUnavailable -> ConsentUnavailableScreen(onRetry = { consentUnavailable = false; consentAttempt += 1 })
         !consentChecked -> BrandSplash()
         consent?.required == true -> ConsentScreen(
             version = consent?.requiredVersion ?: "",
@@ -182,6 +242,13 @@ fun OneApp(currentTheme: String, onThemeChange: (String) -> Unit) {
             Session.setWorkspace(context, encodeWorkspace(picked))
         }
         workspace!!.kind == WorkspaceKind.OPS -> OpsScaffold(
+            currentTheme = currentTheme,
+            onThemeChange = onThemeChange,
+            onSignOut = { Session.clear(context); workspace = null; signedIn = false },
+            onSwitchWorkspace = if (multiWorkspace) ({ Session.setWorkspace(context, null); workspace = null }) else null,
+        )
+        workspace!!.kind == WorkspaceKind.GROWTH -> GrowthScaffold(
+            role = workspace!!.role,
             currentTheme = currentTheme,
             onThemeChange = onThemeChange,
             onSignOut = { Session.clear(context); workspace = null; signedIn = false },
@@ -220,8 +287,8 @@ fun OneApp(currentTheme: String, onThemeChange: (String) -> Unit) {
     }
 }
 
-/** Continues the system splash's look: black brand ground, the original
- *  silver wordmark, the 8 spinning in place while the app loads. */
+/** Continues the system splash's look: black brand ground, the ONE "o" mark
+ *  with its blue centre dot pulsing while the app loads, then the lockup. */
 @Composable
 private fun BrandSplash() {
     Column(
@@ -229,10 +296,16 @@ private fun BrandSplash() {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        BrandWordmark(height = 46.dp, spinEight = true)
-        Spacer(Modifier.height(18.dp))
-        Text("ONE", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color(0xFFD9DCE1))
-        Text("The campus-to-career workspace", style = MaterialTheme.typography.bodySmall, color = Color(0xFF8E939C))
+        BrandMark(size = 112.dp, pulse = true)
+        Spacer(Modifier.height(20.dp))
+        BrandLogo(height = 64.dp, surface = LogoSurface.Dark)
+        Spacer(Modifier.height(14.dp))
+        Image(
+            painter = painterResource(R.drawable.one_tagline_dark),
+            contentDescription = "Learn, prepare, build, grow",
+            modifier = Modifier.height(10.dp),
+            contentScale = ContentScale.FillHeight,
+        )
     }
 }
 
@@ -244,7 +317,7 @@ private fun DemoAccountScreen(onSignOut: () -> Unit) {
     Column(Modifier.fillMaxSize().background(palette.bandBottom)) {
         BrandBand {
             Spacer(Modifier.height(20.dp))
-            BrandWordmark(height = 24.dp, tint = palette.wordmarkTint)
+            BrandLogo(height = 44.dp, surface = palette.logoOnBand)
             Spacer(Modifier.height(12.dp))
             Text("Demo account", style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold, color = palette.bandInk)
@@ -254,10 +327,10 @@ private fun DemoAccountScreen(onSignOut: () -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally) {
                 IconBubble(Icons.Filled.AutoAwesome, Tone.Amber, size = 64.dp)
                 Spacer(Modifier.height(16.dp))
-                Text("This account showcases the web pilot", style = MaterialTheme.typography.titleMedium,
+                Text("This account is for the guided tour on the web", style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                 Spacer(Modifier.height(6.dp))
-                Text("Demo accounts present a guided, fictional walkthrough at one.ai8ht.pro on the web. " +
+                Text("Demo accounts present a guided, fictional walkthrough at oneby8.com on the web. " +
                     "The app shows real accounts with real data — sign in with your own account instead.",
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center)
@@ -280,6 +353,8 @@ private fun MainScaffold(
     val context = LocalContext.current
     val palette = pro.ai8ht.one.ui.LocalOnePalette.current
     var screen by remember { mutableStateOf(Screen.Home) }
+    // The lesson "Resume lesson" asked for; Learning scrolls to it and marks it.
+    var focusLesson by remember { mutableStateOf<String?>(null) }
     var data by remember { mutableStateOf<StudentData?>(null) }
     var loadError by remember { mutableStateOf(false) }
     var reloadKey by remember { mutableIntStateOf(0) }
@@ -287,37 +362,72 @@ private fun MainScaffold(
     var showChat by remember { mutableStateOf(false) }
     var showEditProfile by remember { mutableStateOf(false) }
     var moreDest by remember { mutableStateOf<MoreDest?>(null) }
+    var readinessOpen by remember { mutableStateOf(false) }
+    // The student's institution is on the security context, not the student record: a
+    // student can have several relationships over time, and the active one is what
+    // scopes anything their college assigned them.
+    var studentInstitutionId by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        studentInstitutionId = runCatching { Api.securityContext(context) }.getOrNull()
+            ?.studentRelationships?.firstOrNull { it.state == "ACTIVE" || it.state == "VERIFIED" }
+            ?.institutionId
+    }
     var showTheme by remember { mutableStateOf(false) }
     var avatarVersion by remember { mutableIntStateOf(0) }
     var refreshing by remember { mutableStateOf(false) }
 
-    LaunchedEffect(reloadKey) {
-        loadError = false
-        var unauthorized = false
-        suspend fun <T> guarded(block: suspend () -> T): T? = try { block() } catch (error: Api.ApiException) {
-            if (error.status == 401) unauthorized = true
-            null
-        } catch (error: Exception) { null }
-        coroutineScope {
-            val student = async { guarded { Api.studentMe(context) } }
-            val exams = async { guarded { Api.listAssessments(context) } }
-            val learner = async { guarded { Api.learnerState(context) } }
-            val inbox = async { guarded { Api.listNotifications(context) } }
-            val loaded = StudentData(student.await(), exams.await() ?: emptyList(), learner.await(), inbox.await())
-            if (unauthorized) { onSessionExpired(); return@coroutineScope }
-            if (loaded.student == null && loaded.learner == null && loaded.notifications == null) loadError = true
-            data = loaded
+    // Data now comes from a ViewModel over a cache-then-network repository, so a tab
+    // switch or a rotation no longer throws everything away and re-fetches it. What the
+    // screens below consume is unchanged; only where it comes from has moved.
+    val studentVm: pro.ai8ht.one.data.StudentViewModel =
+        androidx.lifecycle.viewmodel.compose.viewModel()
+    LaunchedEffect(Unit) { studentVm.start() }
+    LaunchedEffect(reloadKey) { if (reloadKey > 0) studentVm.refresh() }
+
+    val studentState by studentVm.student.collectAsState()
+    val assessmentsState by studentVm.assessments.collectAsState()
+    val learnerState by studentVm.learner.collectAsState()
+    val notificationsState by studentVm.notifications.collectAsState()
+    val activityState by studentVm.activity.collectAsState()
+    val sessionEnded by studentVm.sessionEnded.collectAsState()
+
+    // An expired session returns to sign-in rather than sitting on a retry screen that
+    // can never succeed. The cache goes with it: it belongs to the session that ended.
+    LaunchedEffect(sessionEnded) {
+        if (sessionEnded) {
+            studentVm.clearOnSignOut()
+            studentVm.acknowledgeSessionEnded()
+            onSessionExpired()
         }
-        refreshing = false
+    }
+
+    LaunchedEffect(studentState, assessmentsState, learnerState, notificationsState, activityState) {
+        data = StudentData(
+            student = studentState.valueOrNull(),
+            assessments = assessmentsState.valueOrNull() ?: emptyList(),
+            learner = learnerState.valueOrNull(),
+            notifications = notificationsState.valueOrNull(),
+            activity = activityState.valueOrNull(),
+        )
+        // Only an error when nothing at all resolved, cache included. A stale screen is
+        // a working screen.
+        loadError = studentState is pro.ai8ht.one.data.Repository.State.Failed &&
+            learnerState is pro.ai8ht.one.data.Repository.State.Failed &&
+            notificationsState is pro.ai8ht.one.data.Repository.State.Failed
+        if (data?.student != null || data?.learner != null) refreshing = false
+        if (loadError) refreshing = false
     }
 
     // System back closes the topmost overlay instead of quitting the app.
-    androidx.activity.compose.BackHandler(enabled = showChat || showEditProfile || showInbox || showTheme || moreDest != null) {
+    androidx.activity.compose.BackHandler(
+        enabled = showChat || showEditProfile || showInbox || showTheme || readinessOpen || moreDest != null,
+    ) {
         when {
             showChat -> showChat = false
             showEditProfile -> showEditProfile = false
             showInbox -> showInbox = false
             showTheme -> showTheme = false
+            readinessOpen -> readinessOpen = false
             else -> moreDest = null
         }
     }
@@ -335,7 +445,32 @@ private fun MainScaffold(
         }
         moreDest == MoreDest.Documents -> { SlideIn { DocumentsPage(onClose = { moreDest = null }) }; return }
         moreDest == MoreDest.Privacy -> { SlideIn { PrivacyPage(onClose = { moreDest = null }) }; return }
+        moreDest == MoreDest.Calendar -> { SlideIn { CalendarPage(onClose = { moreDest = null }) }; return }
+        moreDest == MoreDest.Screening -> { SlideIn { ScreeningPage(onClose = { moreDest = null }) }; return }
+        moreDest == MoreDest.Resources -> { SlideIn { ResourcesPage(onClose = { moreDest = null }) }; return }
+        moreDest == MoreDest.Share -> { SlideIn { ShareProfilePage(onClose = { moreDest = null }) }; return }
         moreDest == MoreDest.Career -> { SlideIn { CareerPage(data?.learner, onClose = { moreDest = null }) }; return }
+        readinessOpen -> {
+            SlideIn {
+                ReadinessAssessmentPage(
+                    onClose = { readinessOpen = false },
+                    onSubmitted = { reloadKey += 1 },
+                )
+            }
+            return
+        }
+        moreDest == MoreDest.Target -> { SlideIn { CareerTargetPage(onClose = { moreDest = null }) }; return }
+        moreDest == MoreDest.Academics -> { SlideIn { AcademicRecordsPage(onClose = { moreDest = null }) }; return }
+        moreDest == MoreDest.Support -> {
+            SlideIn {
+                SupportTasksPage(
+                    institutionId = studentInstitutionId,
+                    onClose = { moreDest = null },
+                )
+            }
+            return
+        }
+        moreDest == MoreDest.Explain -> { SlideIn { ExplainPage(onClose = { moreDest = null }) }; return }
         moreDest == MoreDest.Help -> { SlideIn { HelpFaqPage(persona = "student", onClose = { moreDest = null }) }; return }
         moreDest == MoreDest.Settings -> { SlideIn { SettingsPage(currentTheme = currentTheme, onThemeChange = onThemeChange, onClose = { moreDest = null }, onSignOut = onSignOut, onSwitchWorkspace = onSwitchWorkspace) }; return }
     }
@@ -378,7 +513,7 @@ private fun MainScaffold(
         Column(Modifier.padding(padding).fillMaxSize()) {
         BrandBand {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                BrandWordmark(height = 17.dp, tint = palette.wordmarkTint)
+                BrandLogo(height = 34.dp, surface = palette.logoOnBand)
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = { showTheme = true }) {
                     Icon(Icons.Filled.Palette, contentDescription = "Theme", tint = palette.bandMuted)
@@ -445,15 +580,20 @@ private fun MainScaffold(
                     Column(Modifier.fillMaxSize()) {
                         if (current == Screen.Home) Spacer(Modifier.height(2.dp))
                         when (current) {
-                            Screen.Home -> HomeScreen(
+                            Screen.Home -> PilotHomeScreen(
                                 data!!,
+                                activity = data!!.activity,
                                 onOpen = { screen = it },
                                 onInbox = { showInbox = true },
                                 onChat = { showChat = true },
                                 onSection = { moreDest = it },
+                                onOpenLesson = { focusLesson = it; screen = Screen.Learning },
                             )
-                            Screen.Assessments -> AssessmentsScreen(data!!.assessments)
-                            Screen.Learning -> LearningScreen(data!!.learner, onChanged = { reloadKey += 1 })
+                            Screen.Assessments -> AssessmentsScreen(
+                                data!!.assessments,
+                                onOpenReadiness = { readinessOpen = true },
+                            )
+                            Screen.Learning -> LearningScreen(data!!.learner, onChanged = { reloadKey += 1 }, onOpenCareer = { moreDest = MoreDest.Target }, focusLessonId = focusLesson)
                             Screen.Jobs -> JobsScreen()
                             Screen.More -> MoreMenuScreen(data!!.student, avatarVersion, onOpen = { moreDest = it }, onSignOut = onSignOut)
                         }
@@ -659,7 +799,7 @@ private fun ProgressRing(progress: Float, center: String, caption: String) {
 }
 
 @Composable
-private fun QuickTile(
+internal fun QuickTile(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     tone: Tone,
     label: String,
@@ -694,22 +834,29 @@ private fun QuickTile(
 // --- Assessments --------------------------------------------------------------
 
 @Composable
-private fun AssessmentsScreen(items: List<AssessmentDto>) {
+private fun AssessmentsScreen(items: List<AssessmentDto>, onOpenReadiness: () -> Unit) {
+    val bannerPalette = pro.ai8ht.one.ui.LocalOnePalette.current
     if (items.isEmpty()) {
-        EmptyState(Icons.Filled.Assignment, Tone.Accent,
-            "No assessments yet",
-            "Your placement cell assigns tests to you. They appear here with their windows, timers and results.")
+        // Not an empty screen any more: institution exams may be absent while a
+        // readiness check is still available, and those are two different things.
+        Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+            Spacer(Modifier.height(12.dp))
+            ReadinessEntryCard(onOpenReadiness)
+            EmptyState(Icons.Filled.Assignment, Tone.Accent,
+                "No exams assigned yet",
+                "Your placement cell assigns tests to you. They appear here with their windows, timers and results.")
+        }
         return
     }
     val results = items.mapNotNull { it.latestResult }
-    val bannerPalette = pro.ai8ht.one.ui.LocalOnePalette.current
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+        item { Spacer(Modifier.height(12.dp)); ReadinessEntryCard(onOpenReadiness) }
         if (items.any { it.openAttemptId != null }) {
             item {
                 Spacer(Modifier.height(10.dp))
                 val (warnBg, warnFg) = bannerPalette.soft(Tone.Amber)
                 Surface(color = warnBg, contentColor = warnFg, shape = RoundedCornerShape(12.dp)) {
-                    Text("You have an attempt in progress. Exams are laptop-only — continue right away at one.ai8ht.pro on a laptop; the timer keeps running.",
+                    Text("You have an attempt in progress. Exams are laptop-only — continue right away at oneby8.com on a laptop; the timer keeps running.",
                         Modifier.padding(12.dp), style = MaterialTheme.typography.labelMedium)
                 }
             }
@@ -787,12 +934,12 @@ private fun AssessmentCard(exam: AssessmentDto) {
                 Spacer(Modifier.height(8.dp))
                 val (warnBg, warnFg) = palette.soft(Tone.Amber)
                 Surface(color = warnBg, contentColor = warnFg, shape = RoundedCornerShape(10.dp)) {
-                    Text("Attempt in progress — continue now on your LAPTOP at one.ai8ht.pro. The timer keeps running; exams cannot be taken on mobile.",
+                    Text("Attempt in progress — continue now on your LAPTOP at oneby8.com. The timer keeps running; exams cannot be taken on mobile.",
                         Modifier.padding(10.dp), style = MaterialTheme.typography.labelMedium)
                 }
             } else if (ends != null && now.isBefore(ends)) {
                 Spacer(Modifier.height(6.dp))
-                Text("Open until ${formatWhen(exam.endsAt)} · exams are taken on a laptop at one.ai8ht.pro",
+                Text("Open until ${formatWhen(exam.endsAt)} · exams are taken on a laptop at oneby8.com",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -802,24 +949,49 @@ private fun AssessmentCard(exam: AssessmentDto) {
 // --- Learning -----------------------------------------------------------------
 
 @Composable
-private fun LearningScreen(learner: LearnerStateDto?, onChanged: () -> Unit) {
+private fun LearningScreen(learner: LearnerStateDto?, onChanged: () -> Unit, onOpenCareer: () -> Unit, focusLessonId: String? = null) {
     val context = LocalContext.current
     val palette = pro.ai8ht.one.ui.LocalOnePalette.current
     val scope = rememberCoroutineScope()
     var busyLesson by remember { mutableStateOf<String?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
 
+    // ENG-18: the learning plan (placement test, next step and practice, path, due reviews) comes first,
+    // whether or not any module is published.
     if (learner == null || learner.catalog.modules.isEmpty()) {
-        EmptyState(Icons.Filled.MenuBook, Tone.Green,
-            "No modules yet",
-            "Learning modules appear here once your institution publishes them. Completed lessons build your readiness.")
+        LazyColumn(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+            item { LearningPlanSection(onOpenCareer) }
+            item {
+                Spacer(Modifier.height(12.dp))
+                PilotCard {
+                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        IconBubble(Icons.Filled.MenuBook, pro.ai8ht.one.ui.Tone.Green, size = 44.dp)
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("No modules yet", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                            Text("Learning modules appear here once your institution publishes them. Completed lessons build your readiness.",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+                Spacer(Modifier.height(18.dp))
+            }
+        }
         return
     }
     val done = learner.progress.filter { it.state == "COMPLETED" }.map { it.lessonVersionId }.toSet()
     val allLessons = learner.catalog.modules.flatMap { it.lessons }
     val doneCount = allLessons.count { done.contains(it.id) }
+    // "Resume lesson": scroll to the module holding the asked-for lesson (plan, progress and the
+    // optional language card come first), and mark that lesson's row.
+    val listState = rememberLazyListState()
+    val focusModule = focusLessonId?.let { id -> learner.catalog.modules.indexOfFirst { module -> module.lessons.any { it.id == id } } } ?: -1
+    LaunchedEffect(focusLessonId, focusModule) {
+        if (focusModule >= 0) listState.scrollToItem(2 + (if (learner.lessonLanguage != null) 1 else 0) + focusModule)
+    }
 
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 18.dp), state = listState) {
+        item { LearningPlanSection(onOpenCareer) }
         item {
             Spacer(Modifier.height(10.dp))
             PilotCard {
@@ -840,6 +1012,12 @@ private fun LearningScreen(learner: LearnerStateDto?, onChanged: () -> Unit) {
                     Text("$doneCount/${allLessons.size}", style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 }
+            }
+        }
+        learner.lessonLanguage?.let { choice ->
+            item {
+                Spacer(Modifier.height(10.dp))
+                LessonLanguageCard(choice, onChanged)
             }
         }
         message?.let { text ->
@@ -874,7 +1052,13 @@ private fun LearningScreen(learner: LearnerStateDto?, onChanged: () -> Unit) {
                     Spacer(Modifier.height(6.dp))
                     module.lessons.forEach { lesson ->
                         val isDone = done.contains(lesson.id)
-                        Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        val focused = lesson.id == focusLessonId
+                        Row(
+                            Modifier.fillMaxWidth()
+                                .then(if (focused) Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp)).padding(horizontal = 8.dp) else Modifier)
+                                .padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
                             Icon(
                                 if (isDone) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
                                 contentDescription = null,
@@ -882,7 +1066,8 @@ private fun LearningScreen(learner: LearnerStateDto?, onChanged: () -> Unit) {
                                 modifier = Modifier.size(20.dp),
                             )
                             Spacer(Modifier.width(10.dp))
-                            Text(lesson.title, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                            // ENG-16: in the chosen language where published, else English with a notice.
+                            LessonWords(lesson, learner.lessonLanguage, Modifier.weight(1f))
                             if (!isDone) {
                                 TextButton(
                                     enabled = busyLesson == null,
@@ -932,10 +1117,35 @@ private fun InboxOverlay(feed: NotificationsEnvelope?, onClose: () -> Unit, onAl
             feed == null || feed.notifications.isEmpty() ->
                 EmptyState(Icons.Filled.Notifications, Tone.Amber,
                     "All caught up",
-                    "Nothing needs your attention. Assignments, reopenings and results land here the moment they happen.")
+                    "Nothing needs your attention. College announcements, assignments, results, and news about your applications, interviews and offers land here the moment they happen.")
             else -> LazyColumn(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+                // INST-06: college announcements get their own list, with who they are from.
+                val announcements = feed.notifications.filter { it.kind == "ANNOUNCEMENT" }
+                val others = feed.notifications.filter { it.kind != "ANNOUNCEMENT" }
                 item { Spacer(Modifier.height(10.dp)) }
-                items(feed.notifications, key = { it.id }) { note ->
+                if (announcements.isNotEmpty()) {
+                    item { Text("Announcements", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(vertical = 6.dp)) }
+                    items(announcements, key = { it.id }) { note ->
+                        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+                            Box(Modifier.width(3.dp).fillMaxHeight()
+                                .background(if (note.readAt == null) MaterialTheme.colorScheme.primary else Color.Transparent))
+                            Column(Modifier.padding(start = 13.dp, end = 16.dp, top = 10.dp, bottom = 10.dp)) {
+                                Text(note.title, style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = if (note.readAt == null) FontWeight.Bold else FontWeight.Normal)
+                                Spacer(Modifier.height(2.dp))
+                                Text(note.body, style = MaterialTheme.typography.bodySmall)
+                                Spacer(Modifier.height(2.dp))
+                                Text(note.announcementSource(), style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                    }
+                    if (others.isNotEmpty()) item { Text("Other notifications", style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 14.dp, bottom = 6.dp)) }
+                }
+                items(others, key = { it.id }) { note ->
                     Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
                         Box(Modifier.width(3.dp).fillMaxHeight()
                             .background(if (note.readAt == null) MaterialTheme.colorScheme.primary else Color.Transparent))
@@ -957,7 +1167,21 @@ private fun InboxOverlay(feed: NotificationsEnvelope?, onClose: () -> Unit, onAl
 // --- Sign in / consent ---------------------------------------------------------
 
 @Composable
-private fun SignInScreen(expired: Boolean = false, onSignedIn: () -> Unit) {
+private fun SignInScreen(
+    expired: Boolean = false,
+    oauthRedirect: android.net.Uri? = null,
+    onRedirectHandled: () -> Unit = {},
+    onSignedIn: () -> Unit,
+) {
+    val redirectContext = LocalContext.current
+    var redirectError by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(oauthRedirect) {
+        val uri = oauthRedirect ?: return@LaunchedEffect
+        runCatching { OAuth.complete(redirectContext, uri) }
+            .onSuccess { if (it) onSignedIn() }
+            .onFailure { redirectError = it.message ?: "Sign-in did not complete." }
+        onRedirectHandled()
+    }
     val context = LocalContext.current
     val signPalette = pro.ai8ht.one.ui.LocalOnePalette.current
     val scope = rememberCoroutineScope()
@@ -968,12 +1192,14 @@ private fun SignInScreen(expired: Boolean = false, onSignedIn: () -> Unit) {
     var showAdvanced by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    // Forgot password replaces the sign-in card in place, so the band and theme stay put.
+    var resetting by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().background(signPalette.bandBottom)) {
         BrandBand {
             Spacer(Modifier.height(34.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                BrandWordmark(height = 40.dp, spinEight = true, tint = signPalette.wordmarkTint)
+                BrandLogo(height = 76.dp, surface = signPalette.logoOnBand)
             }
             Spacer(Modifier.height(12.dp))
             Text(
@@ -988,7 +1214,10 @@ private fun SignInScreen(expired: Boolean = false, onSignedIn: () -> Unit) {
         BandSheet {
         Column(Modifier.fillMaxSize().padding(20.dp).verticalScroll(rememberScrollState())) {
         Spacer(Modifier.height(8.dp))
-        PilotCard {
+        if (resetting) PasswordResetCard(initialEmail = email, onBack = { returned ->
+            if (returned.isNotBlank()) email = returned
+            password = ""; error = null; resetting = false
+        }) else PilotCard {
             Column(Modifier.padding(20.dp)) {
                 Text("Sign in", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 if (expired) {
@@ -999,24 +1228,46 @@ private fun SignInScreen(expired: Boolean = false, onSignedIn: () -> Unit) {
                     }
                 }
                 Spacer(Modifier.height(12.dp))
-                val fieldColors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                )
+                val fieldColors = signInFieldColors()
                 OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email") },
-                    modifier = Modifier.fillMaxWidth(), singleLine = true, shape = RoundedCornerShape(10.dp), colors = fieldColors)
-                Spacer(Modifier.height(10.dp))
-                OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text("Password") },
                     modifier = Modifier.fillMaxWidth(), singleLine = true,
-                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Password),
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Email, autoCorrectEnabled = false),
                     shape = RoundedCornerShape(10.dp), colors = fieldColors)
-                error?.let {
+                Spacer(Modifier.height(10.dp))
+                PasswordField(value = password, onValueChange = { password = it }, label = "Password")
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = { error = null; resetting = true }, enabled = !busy) {
+                        Text("Forgot password?", color = signPalette.accent, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+                (error ?: redirectError)?.let {
                     Spacer(Modifier.height(8.dp))
                     Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
-                Spacer(Modifier.height(14.dp))
+                // Hosted sign-in, shown only once an operator has registered the mobile
+                // app client. It is the only path that can complete an MFA challenge, so
+                // it is offered first and password sign-in becomes the fallback.
+                if (OAuth.isConfigured()) {
+                    Spacer(Modifier.height(14.dp))
+                    Button(
+                        onClick = {
+                            error = null
+                            runCatching { OAuth.begin(context) }
+                                .onFailure { error = it.message ?: "Could not start sign-in." }
+                        },
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                    ) { Text("Sign in securely") }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Opens your browser so two-factor sign-in works.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
                 Button(
                     onClick = {
                         busy = true; error = null
@@ -1030,17 +1281,22 @@ private fun SignInScreen(expired: Boolean = false, onSignedIn: () -> Unit) {
                         }
                     },
                     enabled = !busy && email.isNotBlank() && password.isNotBlank(),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().height(46.dp),
                     shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                ) { Text(if (busy) "Signing in…" else "Sign in") }
+                    colors = ButtonDefaults.buttonColors(containerColor = signPalette.accent, contentColor = signPalette.onAccent),
+                ) { Text(if (busy) "Signing in…" else "Sign in", fontWeight = FontWeight.SemiBold) }
 
+                // Token sign-in and the API override are developer tools: debug builds only,
+                // so no release user ever sees them or the test-environment wording.
+                if (BuildConfig.DEBUG) {
                 Spacer(Modifier.height(10.dp))
                 TextButton(onClick = { showAdvanced = !showAdvanced }) {
-                    Text(if (showAdvanced) "Hide UAT options" else "UAT options (token sign-in)")
+                    Text(if (showAdvanced) "Hide developer options" else "Developer options (token sign-in)",
+                        color = signPalette.muted)
                 }
-                if (showAdvanced) {
-                    OutlinedTextField(value = token, onValueChange = { token = it }, label = { Text("Access token (UAT)") },
+                }
+                if (BuildConfig.DEBUG && showAdvanced) {
+                    OutlinedTextField(value = token, onValueChange = { token = it }, label = { Text("Access token") },
                         modifier = Modifier.fillMaxWidth(), minLines = 3, shape = RoundedCornerShape(10.dp), colors = fieldColors)
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(value = apiOverride, onValueChange = { apiOverride = it },
@@ -1066,6 +1322,21 @@ private fun SignInScreen(expired: Boolean = false, onSignedIn: () -> Unit) {
 }
 
 @Composable
+private fun ConsentUnavailableScreen(onRetry: () -> Unit) {
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(20.dp).verticalScroll(rememberScrollState())) {
+        Spacer(Modifier.height(24.dp))
+        BrandLogo(height = 44.dp, surface = logoSurfaceFor(pro.ai8ht.one.ui.LocalOnePalette.current))
+        Spacer(Modifier.height(20.dp))
+        Text("We could not confirm your privacy consent", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(6.dp))
+        Text("ONE will not open your workspace until it can confirm your consent is on record. This is usually a temporary connection problem.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(16.dp))
+        Button(onClick = onRetry, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp)) { Text("Try again") }
+    }
+}
+
+@Composable
 private fun ConsentScreen(version: String, onGranted: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -1073,7 +1344,7 @@ private fun ConsentScreen(version: String, onGranted: () -> Unit) {
     var error by remember { mutableStateOf<String?>(null) }
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(20.dp).verticalScroll(rememberScrollState())) {
         Spacer(Modifier.height(24.dp))
-        BrandWordmark(height = 22.dp)
+        BrandLogo(height = 44.dp, surface = logoSurfaceFor(pro.ai8ht.one.ui.LocalOnePalette.current))
         Spacer(Modifier.height(20.dp))
         Text("Your data, your consent", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(6.dp))
@@ -1107,5 +1378,32 @@ private fun ConsentScreen(version: String, onGranted: () -> Unit) {
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(10.dp),
         ) { Text(if (busy) "Recording…" else "I have read the notice and I consent") }
+    }
+}
+
+/**
+ * Entry point to the readiness check.
+ *
+ * Kept visually distinct from institution exams because they are not the same thing:
+ * exams are assigned, timed and laptop-only; this is a short self-service check that
+ * moves the advisory band.
+ */
+@Composable
+private fun ReadinessEntryCard(onOpen: () -> Unit) {
+    PilotCard {
+        Row(
+            Modifier.fillMaxWidth().clickable { onOpen() }.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconBubble(Icons.Filled.Assignment, Tone.Green)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Readiness check", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("A few questions, right here on your phone",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+        }
     }
 }

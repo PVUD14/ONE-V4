@@ -1,0 +1,11 @@
+# Runs one-sandbox-reset.service every night at 02:30 India time (21:00 UTC), when no
+# demo is running. Persistent=true runs a missed reset after the server was off.
+[Unit]
+Description=Nightly reset of the ONE sandbox (demo.oneby8.com)
+
+[Timer]
+OnCalendar=*-*-* 21:00:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target

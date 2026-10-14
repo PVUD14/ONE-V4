@@ -1,0 +1,1305 @@
+{
+ "email": "graduate@demo.oneby8.com",
+ "landing": "/student",
+ "labels": [
+  "Home",
+  "My Career",
+  "AI Career Coach",
+  "Career Tools",
+  "Readiness",
+  "Skills",
+  "Assessments",
+  "Learning",
+  "Practice",
+  "Company Prep",
+  "Experience",
+  "Opportunities",
+  "Applications",
+  "Interviews",
+  "Calendar",
+  "Scholarships",
+  "Resume Builder",
+  "Documents",
+  "Profile",
+  "Settings",
+  "Help & FAQ"
+ ],
+ "responses": {
+  "GET /health": {
+   "status": 200,
+   "body": {
+    "status": "ok"
+   }
+  },
+  "GET /api/v1/security/context": {
+   "status": 200,
+   "body": {
+    "userId": "faf5035b-3cc7-4f94-8eb9-db52330e606b",
+    "selectedOrganizationId": null,
+    "memberships": [],
+    "studentRelationships": [],
+    "formerStudentRelationships": [
+     {
+      "institutionId": "8e246485-4565-48a9-9e69-de906633a082",
+      "state": "GRADUATED",
+      "effectiveFrom": "2018-08-01 00:00:00+00",
+      "effectiveTo": "2022-05-31 00:00:00+00"
+     }
+    ],
+    "correlationId": "2cd0a138-0e96-4f86-868e-2ccd036c57b3"
+   }
+  },
+  "GET /api/v1/me/consents/privacy-notice": {
+   "status": 200,
+   "body": {
+    "requiredVersion": null,
+    "grantedVersion": null,
+    "required": false,
+    "correlationId": "c817b637-74a9-487b-ad4a-5651d03356a1"
+   }
+  },
+  "GET /api/v1/students/me": {
+   "status": 200,
+   "body": {
+    "student": {
+     "userId": "faf5035b-3cc7-4f94-8eb9-db52330e606b",
+     "verifiedEmail": "graduate@demo.oneby8.com",
+     "fullName": "Kavitha Selvam",
+     "institutionStudentId": "LIT-CSE-22-014",
+     "institutionId": "8e246485-4565-48a9-9e69-de906633a082",
+     "institutionName": "Lakeview Institute of Technology",
+     "academicStatus": "GRADUATED",
+     "formerStudent": true,
+     "department": "Computer Science and Engineering",
+     "program": "B.Tech Computer Science and Engineering",
+     "batch": null,
+     "section": null,
+     "relationship": {
+      "id": "25f1a62b-7d71-476c-b980-321f0215d3b4",
+      "state": "GRADUATED",
+      "effectiveFrom": "2018-08-01 00:00:00+00",
+      "effectiveTo": "2022-05-31 00:00:00+00"
+     }
+    },
+    "correlationId": "e6a83de4-1c5a-4551-af73-1a4f99e0ea84"
+   }
+  },
+  "GET /api/v1/me/notifications": {
+   "status": 200,
+   "body": {
+    "notifications": [],
+    "unreadCount": 0,
+    "correlationId": "f9c4a6d4-1da5-4606-8e86-43bbb909d527"
+   }
+  },
+  "GET /api/v1/student/assessments": {
+   "status": 200,
+   "body": {
+    "assessments": [],
+    "correlationId": "e7ddc61b-2fac-4e3a-a36a-59cbcdb3caf4"
+   }
+  },
+  "GET /api/v1/students/me/profile": {
+   "status": 200,
+   "body": {
+    "profile": {
+     "userId": "faf5035b-3cc7-4f94-8eb9-db52330e606b",
+     "verifiedEmail": "graduate@demo.oneby8.com",
+     "targetCareer": "Software Engineer",
+     "careerInterests": [],
+     "profileHeadline": "Lakeview B.Tech CSE graduate, 2022",
+     "profileSummary": "Sample profile in the ONE sandbox. This graduate is fictional.",
+     "portfolioUrl": null,
+     "visibilityState": "PRIVATE",
+     "employerDiscoveryEnabled": false,
+     "updatedAt": "2026-10-07 05:46:51.068943+00"
+    },
+    "correlationId": "9fb0c130-7e04-45a2-9e99-90a0072ecc84"
+   }
+  },
+  "GET /api/v1/student/activity": {
+   "status": 200,
+   "body": {
+    "today": "2026-10-08",
+    "currentStreakDays": 0,
+    "activeDaysLast7": 0,
+    "last7": [
+     {
+      "date": "2026-10-02",
+      "count": 0
+     },
+     {
+      "date": "2026-10-03",
+      "count": 0
+     },
+     {
+      "date": "2026-10-04",
+      "count": 0
+     },
+     {
+      "date": "2026-10-05",
+      "count": 0
+     },
+     {
+      "date": "2026-10-06",
+      "count": 0
+     },
+     {
+      "date": "2026-10-07",
+      "count": 0
+     },
+     {
+      "date": "2026-10-08",
+      "count": 0
+     }
+    ],
+    "days": [],
+    "correlationId": "7f630de0-b0f7-47c6-b68d-06c876e90955"
+   }
+  },
+  "GET /api/v1/career-readiness/me": {
+   "status": 200,
+   "body": {
+    "catalog": {
+     "pilot": "Career Readiness Fundamentals",
+     "releaseManifestId": "25000000-0000-4000-8000-000000000001",
+     "topics": [
+      {
+       "id": "20000000-0000-4000-8000-000000000002",
+       "stableKey": "interview-foundations",
+       "name": "Interview Foundations",
+       "description": "Evidence-based preparation and concise interview responses."
+      },
+      {
+       "id": "20000000-0000-4000-8000-000000000001",
+       "stableKey": "professional-communication",
+       "name": "Professional Communication",
+       "description": "Clear, audience-aware workplace communication."
+      }
+     ],
+     "modules": [
+      {
+       "id": "21000000-0000-4000-8000-000000000001",
+       "stableKey": "career-readiness-fundamentals",
+       "version": 1,
+       "title": "Career Readiness Fundamentals",
+       "description": "A short pilot covering workplace messages, evidence-backed stories, and interview preparation.",
+       "lessons": [
+        {
+         "id": "22000000-0000-4000-8000-000000000002",
+         "body": {
+          "summary": "Describe a situation, your action, and a verifiable result without exaggeration.",
+          "practice": "Turn one project experience into a concise situation-action-result story."
+         },
+         "title": "Build an evidence story",
+         "topicId": "20000000-0000-4000-8000-000000000002",
+         "version": 1,
+         "stableKey": "build-an-evidence-story",
+         "prerequisiteLessonIds": [
+          "22000000-0000-4000-8000-000000000001"
+         ],
+         "language": "en",
+         "languageNotice": null
+        },
+        {
+         "id": "22000000-0000-4000-8000-000000000003",
+         "body": {
+          "summary": "Map role requirements to truthful examples, questions, and a practical rehearsal plan.",
+          "practice": "Choose two requirements and pair each with one evidence story."
+         },
+         "title": "Prepare the interview loop",
+         "topicId": "20000000-0000-4000-8000-000000000002",
+         "version": 1,
+         "stableKey": "prepare-the-interview-loop",
+         "prerequisiteLessonIds": [
+          "22000000-0000-4000-8000-000000000002"
+         ],
+         "language": "en",
+         "languageNotice": null
+        },
+        {
+         "id": "22000000-0000-4000-8000-000000000001",
+         "body": {
+          "summary": "Frame a professional message around context, requested action, owner, and deadline.",
+          "practice": "Rewrite a vague follow-up so the recipient can act without another clarification."
+         },
+         "title": "Write for action",
+         "topicId": "20000000-0000-4000-8000-000000000001",
+         "version": 1,
+         "stableKey": "write-for-action",
+         "prerequisiteLessonIds": [],
+         "language": "en",
+         "languageNotice": null
+        }
+       ]
+      }
+     ],
+     "assessments": [
+      {
+       "id": "23000000-0000-4000-8000-000000000001",
+       "stableKey": "career-readiness-fundamentals-check",
+       "title": "Career Readiness Fundamentals check",
+       "blueprintId": "23000000-0000-4000-8000-000000000002",
+       "selectionCount": 4,
+       "timeLimitSeconds": 900
+      }
+     ]
+    },
+    "lessonLanguage": {
+     "selected": "en",
+     "offered": [
+      {
+       "language": "en",
+       "name": "English",
+       "nativeName": "English"
+      },
+      {
+       "language": "te",
+       "name": "Telugu",
+       "nativeName": "తెలుగు"
+      }
+     ]
+    },
+    "progress": [],
+    "attempts": [],
+    "evidence": [],
+    "mastery": [],
+    "readiness": null,
+    "readinessHistory": [],
+    "roadmap": [],
+    "notificationPreferences": null,
+    "notifications": []
+   }
+  },
+  "GET /api/v1/students/me/applications": {
+   "status": 200,
+   "body": {
+    "applications": [],
+    "evidenceSharingAvailable": false,
+    "correlationId": "89ef375c-6b49-4889-8840-668c097030cb"
+   }
+  },
+  "GET /api/v1/students/me/staff-actions?institutionId=8e246485-4565-48a9-9e69-de906633a082": {
+   "status": 200,
+   "body": {
+    "actions": []
+   }
+  },
+  "GET /api/v1/students/me/counselling-notes?institutionId=8e246485-4565-48a9-9e69-de906633a082": {
+   "status": 200,
+   "body": {
+    "notes": []
+   }
+  },
+  "GET /api/v1/career-readiness/catalog": {
+   "status": 200,
+   "body": {
+    "pilot": "Career Readiness Fundamentals",
+    "releaseManifestId": "25000000-0000-4000-8000-000000000001",
+    "topics": [
+     {
+      "id": "20000000-0000-4000-8000-000000000002",
+      "stableKey": "interview-foundations",
+      "name": "Interview Foundations",
+      "description": "Evidence-based preparation and concise interview responses."
+     },
+     {
+      "id": "20000000-0000-4000-8000-000000000001",
+      "stableKey": "professional-communication",
+      "name": "Professional Communication",
+      "description": "Clear, audience-aware workplace communication."
+     }
+    ],
+    "modules": [
+     {
+      "id": "21000000-0000-4000-8000-000000000001",
+      "stableKey": "career-readiness-fundamentals",
+      "version": 1,
+      "title": "Career Readiness Fundamentals",
+      "description": "A short pilot covering workplace messages, evidence-backed stories, and interview preparation.",
+      "lessons": [
+       {
+        "id": "22000000-0000-4000-8000-000000000002",
+        "body": {
+         "summary": "Describe a situation, your action, and a verifiable result without exaggeration.",
+         "practice": "Turn one project experience into a concise situation-action-result story."
+        },
+        "title": "Build an evidence story",
+        "topicId": "20000000-0000-4000-8000-000000000002",
+        "version": 1,
+        "stableKey": "build-an-evidence-story",
+        "prerequisiteLessonIds": [
+         "22000000-0000-4000-8000-000000000001"
+        ]
+       },
+       {
+        "id": "22000000-0000-4000-8000-000000000003",
+        "body": {
+         "summary": "Map role requirements to truthful examples, questions, and a practical rehearsal plan.",
+         "practice": "Choose two requirements and pair each with one evidence story."
+        },
+        "title": "Prepare the interview loop",
+        "topicId": "20000000-0000-4000-8000-000000000002",
+        "version": 1,
+        "stableKey": "prepare-the-interview-loop",
+        "prerequisiteLessonIds": [
+         "22000000-0000-4000-8000-000000000002"
+        ]
+       },
+       {
+        "id": "22000000-0000-4000-8000-000000000001",
+        "body": {
+         "summary": "Frame a professional message around context, requested action, owner, and deadline.",
+         "practice": "Rewrite a vague follow-up so the recipient can act without another clarification."
+        },
+        "title": "Write for action",
+        "topicId": "20000000-0000-4000-8000-000000000001",
+        "version": 1,
+        "stableKey": "write-for-action",
+        "prerequisiteLessonIds": []
+       }
+      ]
+     }
+    ],
+    "assessments": [
+     {
+      "id": "23000000-0000-4000-8000-000000000001",
+      "stableKey": "career-readiness-fundamentals-check",
+      "title": "Career Readiness Fundamentals check",
+      "blueprintId": "23000000-0000-4000-8000-000000000002",
+      "selectionCount": 4,
+      "timeLimitSeconds": 900
+     }
+    ]
+   }
+  },
+  "GET /api/v1/students/me/goals": {
+   "status": 200,
+   "body": {
+    "onboarding": true,
+    "goals": [],
+    "skills": {
+     "algorithmId": "learner-goal-skills-v1",
+     "skills": []
+    },
+    "catalogueOpen": false
+   }
+  },
+  "GET /api/v1/students/me/goals/options?q=": {
+   "status": 200,
+   "body": {
+    "roles": [
+     {
+      "id": "e706c008-e74c-4cea-9339-e837962b6511",
+      "code": "BUSINESS_ANALYST",
+      "title": "Business Analyst",
+      "family": "Business",
+      "summary": "Works between business teams and delivery teams, turning what people ask for into something that can be built and checked.",
+      "releaseLabel": null,
+      "catalogueCode": null,
+      "matchedSynonym": null
+     },
+     {
+      "id": "dc44636b-cb88-4eda-9c2e-fd185f64f316",
+      "code": "CUSTOMER_SUCCESS",
+      "title": "Customer Success Associate",
+      "family": "Business",
+      "summary": "Helps customers get value from a product and keeps a relationship healthy, including when something has gone wrong.",
+      "releaseLabel": null,
+      "catalogueCode": null,
+      "matchedSynonym": null
+     },
+     {
+      "id": "56f1c668-6846-4618-b112-5ec1b784c65a",
+      "code": "SOC_ANALYST",
+      "title": "Security Operations Analyst",
+      "family": "Cyber Security",
+      "summary": "Monitors security alerts, investigates suspicious activity and escalates genuine incidents. Entry routes usually expect clear written handover and calm escalation under time pressure.",
+      "releaseLabel": null,
+      "catalogueCode": null,
+      "matchedSynonym": null
+     },
+     {
+      "id": "5e3b6462-948b-426f-8209-1ecd335696f0",
+      "code": "DATA_ANALYST",
+      "title": "Data Analyst",
+      "family": "Data",
+      "summary": "Turns data into answers people can act on. The analysis matters less than whether the conclusion is understood and trusted by whoever has to decide.",
+      "releaseLabel": null,
+      "catalogueCode": null,
+      "matchedSynonym": null
+     },
+     {
+      "id": "0b2e11b7-2b4f-4f41-b192-0c2d2f54ec79",
+      "code": "SOFTWARE_ENGINEER",
+      "title": "Software Engineer",
+      "family": "Engineering",
+      "summary": "Builds and maintains software with a team. Entry routes weigh problem solving alongside the ability to explain a decision to people who did not write the code.",
+      "releaseLabel": null,
+      "catalogueCode": null,
+      "matchedSynonym": null
+     }
+    ],
+    "topics": [
+     {
+      "id": "20000000-0000-4000-8000-000000000002",
+      "name": "Interview Foundations"
+     },
+     {
+      "id": "20000000-0000-4000-8000-000000000001",
+      "name": "Professional Communication"
+     }
+    ],
+    "catalogueGoals": [],
+    "catalogueOpen": false
+   }
+  },
+  "GET /api/v1/learner-content?contentType=CAREER_TOOL": {
+   "status": 200,
+   "body": {
+    "items": [
+     {
+      "id": "31d6761d-6147-4308-939b-5ef8f6296575",
+      "contentType": "CAREER_TOOL",
+      "title": "Interview evidence planner",
+      "summary": "A worksheet for selecting evidence before an interview.",
+      "content": {
+       "sections": [
+        "Situation",
+        "Action",
+        "Result",
+        "Verification"
+       ]
+      },
+      "publishedAt": "2026-10-07T05:46:54.199Z"
+     }
+    ],
+    "correlationId": "39914684-f769-4e3c-b043-161cc3e50b1a"
+   }
+  },
+  "GET /api/v1/students/me/screening-assessments": {
+   "status": 200,
+   "body": {
+    "invitations": [],
+    "correlationId": "dfb6830d-0cfb-4774-a0bb-192abae73c25"
+   }
+  },
+  "GET /api/v1/learning/placement-test": {
+   "status": 200,
+   "body": {
+    "placement": {
+     "status": "NOT_AVAILABLE",
+     "reason": "CONSENT_REQUIRED"
+    },
+    "correlationId": "65711de9-2b11-45b1-893c-486cac651e84"
+   }
+  },
+  "GET /api/v1/learning/path": {
+   "status": 200,
+   "body": {
+    "path": {
+     "adaptive": false,
+     "target": null,
+     "requirements": null,
+     "groups": {
+      "policyVersion": "learning-path-groups-v1",
+      "skip": [],
+      "review": [],
+      "learn": []
+     },
+     "dueReviews": [],
+     "latestStep": null
+    },
+    "correlationId": "d9eee9ac-5cb9-4349-8b0d-88af7f4a52e3"
+   }
+  },
+  "GET /api/v1/students/me/learning-actions": {
+   "status": 200,
+   "body": {
+    "assignments": [],
+    "sessions": [],
+    "pendingOverride": null
+   }
+  },
+  "GET /api/v1/learner-content?contentType=PRACTICE": {
+   "status": 200,
+   "body": {
+    "items": [
+     {
+      "id": "eb66720c-9f72-4540-917d-b395a3efa29a",
+      "contentType": "PRACTICE",
+      "title": "Problem-solving practice guide",
+      "summary": "A repeatable structure for working through practice problems.",
+      "content": {
+       "steps": [
+        "Restate the problem",
+        "List known constraints",
+        "Choose an approach",
+        "Check the result"
+       ]
+      },
+      "publishedAt": "2026-10-07T05:46:54.175Z"
+     }
+    ],
+    "correlationId": "51c2a985-91eb-4268-b612-adcdfbe3bc18"
+   }
+  },
+  "GET /api/v1/learner-content?contentType=COMPANY_PREP": {
+   "status": 200,
+   "body": {
+    "items": [
+     {
+      "id": "9bffb1ac-df14-4af2-9454-8c405312b97c",
+      "contentType": "COMPANY_PREP",
+      "title": "Company research checklist",
+      "summary": "A checklist for preparing from verified company and role information.",
+      "content": {
+       "checklist": [
+        "Read the role description",
+        "Review the official company site",
+        "Prepare role-specific questions"
+       ]
+      },
+      "publishedAt": "2026-10-07T05:46:54.187Z"
+     }
+    ],
+    "correlationId": "fa81c927-0215-4b6e-95d5-e13812c32e3d"
+   }
+  },
+  "GET /api/v1/students/me/saved-opportunities": {
+   "status": 200,
+   "body": {
+    "savedOpportunities": [],
+    "correlationId": "62f25668-6e6e-4d61-bcf5-8b80b185e5ae"
+   }
+  },
+  "GET /api/v1/opportunities": {
+   "status": 200,
+   "body": {
+    "opportunities": [],
+    "correlationId": "d77d109c-5510-40ba-b2ac-9ca4bcd4e635"
+   }
+  },
+  "GET /api/v1/students/me/interviews": {
+   "status": 200,
+   "body": {
+    "interviews": [],
+    "correlationId": "5dfc7274-a4c3-476f-b9b1-fb0ae1289469"
+   }
+  },
+  "GET /api/v1/students/me/external-applications?offset=0&limit=50": {
+   "status": 200,
+   "body": {
+    "externalApplications": [],
+    "total": 0,
+    "offset": 0,
+    "limit": 50,
+    "correlationId": "47761fb2-07ce-450d-a939-dd6dd3338d56"
+   }
+  },
+  "GET /api/v1/students/me/offers": {
+   "status": 200,
+   "body": {
+    "offers": [],
+    "correlationId": "9f1b5717-421a-4bf6-b4d8-ff66697657e1"
+   }
+  },
+  "GET /api/v1/students/me/nominations": {
+   "status": 200,
+   "body": {
+    "nominations": [],
+    "correlationId": "23c34345-13a5-46dc-8c4c-c320e27b5fe0"
+   }
+  },
+  "GET /api/v1/learner-content?contentType=SCHOLARSHIP": {
+   "status": 200,
+   "body": {
+    "items": [
+     {
+      "id": "1cfdc4cd-600d-46ab-aa9d-2e9d862b275a",
+      "contentType": "SCHOLARSHIP",
+      "title": "Scholarship application checklist",
+      "summary": "A safety-first checklist for checking eligibility and official deadlines.",
+      "content": {
+       "checklist": [
+        "Confirm eligibility",
+        "Verify the official deadline",
+        "Collect required documents"
+       ]
+      },
+      "publishedAt": "2026-10-07T05:46:54.211Z"
+     }
+    ],
+    "correlationId": "5d164773-6a41-4021-b3cf-c317aa64979a"
+   }
+  },
+  "GET /api/v1/students/me/resumes": {
+   "status": 200,
+   "body": {
+    "resumes": [],
+    "limits": {
+     "resumes": 20,
+     "versions": 50
+    },
+    "correlationId": "3a203d48-12ce-42d1-b08d-687fe3a4ff82"
+   }
+  },
+  "GET /api/v1/students/me/documents": {
+   "status": 200,
+   "body": {
+    "documents": [],
+    "storage": {
+     "fileStorage": "AVAILABLE",
+     "message": "Files are scanned for malware before they are stored."
+    },
+    "correlationId": "cddc8bba-e158-4ee8-874a-070ee37a59e0"
+   }
+  },
+  "GET /api/v1/students/me/resume-sources": {
+   "status": 200,
+   "body": {
+    "sources": {
+     "header": {
+      "fullName": "Kavitha Selvam",
+      "email": "graduate@demo.oneby8.com",
+      "headline": "Lakeview B.Tech CSE graduate, 2022",
+      "summary": "Sample profile in the ONE sandbox. This graduate is fictional.",
+      "portfolioUrl": null
+     },
+     "qualifications": [
+      {
+       "id": "ec2ccb9e-882f-4fd3-a3b5-53b848da2ce6",
+       "title": "B.Tech — B.Tech Computer Science and Engineering",
+       "institution": "Lakeview Institute of Technology",
+       "period": "2018 – 2022",
+       "verification": "Verified by Lakeview Institute of Technology",
+       "verified": true,
+       "terms": [
+        {
+         "id": "274a1e15-1e3f-4411-8db5-9ab27b939e1e",
+         "label": "Semester 1",
+         "result": "8.60 CGPA (of 10)",
+         "verification": "Verified by Lakeview Institute of Technology",
+         "verified": true
+        },
+        {
+         "id": "b57d67a9-380b-49cc-a63c-032eb7b6b5c7",
+         "label": "Semester 2",
+         "result": "8.10 CGPA (of 10)",
+         "verification": "Verified by Lakeview Institute of Technology",
+         "verified": true
+        },
+        {
+         "id": "1dddd47d-4b28-46a4-b94e-9e66a1e684ad",
+         "label": "Semester 3",
+         "result": "8.50 CGPA (of 10)",
+         "verification": "Verified by Lakeview Institute of Technology",
+         "verified": true
+        },
+        {
+         "id": "44a914b8-7e13-4d95-b99c-b0c829bad432",
+         "label": "Semester 4",
+         "result": "8.30 CGPA (of 10)",
+         "verification": "Verified by Lakeview Institute of Technology",
+         "verified": true
+        },
+        {
+         "id": "82469789-40d2-470d-b450-11b9c3341eae",
+         "label": "Semester 5",
+         "result": "8.70 CGPA (of 10)",
+         "verification": "Verified by Lakeview Institute of Technology",
+         "verified": true
+        },
+        {
+         "id": "8229287a-26b8-4a73-b2f2-8063d9ad3a16",
+         "label": "Semester 6",
+         "result": "8.20 CGPA (of 10)",
+         "verification": "Verified by Lakeview Institute of Technology",
+         "verified": true
+        },
+        {
+         "id": "5f85e7cb-632d-4fc5-a329-4e7265544aca",
+         "label": "Semester 7",
+         "result": "8.40 CGPA (of 10)",
+         "verification": "Verified by Lakeview Institute of Technology",
+         "verified": true
+        },
+        {
+         "id": "43dad559-7ce4-4ed8-a93f-b469d51e8988",
+         "label": "Semester 8",
+         "result": "8.50 CGPA (of 10)",
+         "verification": "Verified by Lakeview Institute of Technology",
+         "verified": true
+        }
+       ]
+      }
+     ],
+     "skills": [],
+     "certificates": [],
+     "careerTargets": [],
+     "labels": {
+      "selfDeclared": "Self-declared",
+      "pending": "Self-declared · verification pending"
+     }
+    },
+    "templates": [
+     {
+      "key": "CLASSIC",
+      "name": "Classic",
+      "description": "One column, centred name, a thin rule between sections. Reads well everywhere and prints cleanly."
+     },
+     {
+      "key": "MODERN",
+      "name": "Modern",
+      "description": "A coloured header strip with your name and contact line, and accent-coloured section headings."
+     },
+     {
+      "key": "COMPACT",
+      "name": "Compact",
+      "description": "Smaller type and tighter spacing, so a full record still fits on one page."
+     }
+    ],
+    "limits": {
+     "title": 120,
+     "fullName": 160,
+     "headline": 160,
+     "phone": 20,
+     "location": 80,
+     "links": 5,
+     "linkLabel": 60,
+     "url": 256,
+     "summary": 1200,
+     "projects": 10,
+     "projectTitle": 120,
+     "projectDescription": 800,
+     "declaredSkills": 30,
+     "languages": 10,
+     "shortItem": 60,
+     "qualifications": 20,
+     "terms": 60,
+     "skills": 40,
+     "certificates": 20,
+     "careerTargets": 3,
+     "contentBytes": 65536,
+     "selectionsBytes": 32768
+    },
+    "correlationId": "f7a00ab0-71ec-4383-918b-04b2d279bc15"
+   }
+  },
+  "POST /api/v1/students/me/resumes/preview": {
+   "status": 201,
+   "body": {
+    "content": {
+     "schemaVersion": 1,
+     "template": "CLASSIC",
+     "header": {
+      "fullName": "Kavitha Selvam",
+      "headline": "Lakeview B.Tech CSE graduate, 2022",
+      "email": "graduate@demo.oneby8.com",
+      "phone": null,
+      "location": null,
+      "links": []
+     },
+     "summary": "Sample profile in the ONE sandbox. This graduate is fictional.",
+     "objective": [],
+     "education": [
+      {
+       "title": "B.Tech — B.Tech Computer Science and Engineering",
+       "institution": "Lakeview Institute of Technology",
+       "period": "2018 – 2022",
+       "status": "Awarded",
+       "verification": "Verified by Lakeview Institute of Technology",
+       "verified": true,
+       "results": []
+      }
+     ],
+     "skills": {
+      "shown": [],
+      "declared": []
+     },
+     "projects": [],
+     "certificates": [],
+     "languages": [],
+     "legend": "“Verified by” marks a record the named institution confirmed in ONE. Every other item is self-declared.",
+     "generatedOn": "2026-10-08"
+    },
+    "checks": [
+     {
+      "key": "NAME",
+      "passed": true,
+      "message": "Your name is at the top."
+     },
+     {
+      "key": "EMAIL",
+      "passed": true,
+      "message": "A contact email is shown."
+     },
+     {
+      "key": "PHONE",
+      "passed": false,
+      "message": "A phone number is shown."
+     },
+     {
+      "key": "SUMMARY",
+      "passed": true,
+      "message": "A short summary says who you are and what you want to do."
+     },
+     {
+      "key": "EDUCATION",
+      "passed": true,
+      "message": "At least one education entry is included."
+     },
+     {
+      "key": "VERIFIED_EDUCATION",
+      "passed": true,
+      "message": "At least one education entry is verified by an institution."
+     },
+     {
+      "key": "SKILLS",
+      "passed": false,
+      "message": "At least one skill is listed."
+     },
+     {
+      "key": "PROJECTS",
+      "passed": false,
+      "message": "At least one project is described."
+     }
+    ],
+    "correlationId": "0c366af6-b7e9-4016-825b-aff077ab6179"
+   }
+  },
+  "GET /api/v1/students/me/public-profile": {
+   "status": 200,
+   "body": {
+    "link": null,
+    "hasPhoto": false,
+    "correlationId": "f9da69b9-ab47-42eb-87c6-c32fb1a26d5d"
+   }
+  },
+  "GET /api/v1/students/me/outcome-declarations": {
+   "status": 200,
+   "body": {
+    "colleges": [
+     {
+      "institutionId": "8e246485-4565-48a9-9e69-de906633a082",
+      "institutionName": "Lakeview Institute of Technology",
+      "relationship": "GRADUATED",
+      "graduatedOn": "2022-05-31",
+      "declaration": null
+     }
+    ],
+    "correlationId": "d8c73ace-cbfa-4945-bb12-4089d5b29952"
+   }
+  },
+  "GET /api/v1/students/me/talent-pool": {
+   "status": 200,
+   "body": {
+    "talentPool": {
+     "available": false,
+     "optedIn": false,
+     "blocks": [],
+     "discoverable": false,
+     "consent": null,
+     "listing": null,
+     "roster": null,
+     "skills": [],
+     "invitations": []
+    },
+    "correlationId": "bc087630-dd30-446b-aa8d-2ef47215a954"
+   }
+  },
+  "GET /api/v1/students/me/privacy/requests": {
+   "status": 200,
+   "body": {
+    "requests": [],
+    "correlationId": "b0ed7abb-4821-4dee-a8d3-6faac0a7ba47"
+   }
+  },
+  "GET /api/v1/help": {
+   "status": 200,
+   "body": {
+    "articles": [
+     {
+      "id": "signing-in",
+      "personas": [
+       "all"
+      ],
+      "title": "Signing in and choosing a workspace",
+      "keywords": [
+       "login",
+       "sign in",
+       "password",
+       "workspace",
+       "account",
+       "locked"
+      ],
+      "body": "Sign in at oneby8.com with the email and password issued to you. After signing in you land in the workspace that matches your role: students in the student portal, institution staff in the institution portal, employers in the employer portal. If your password does not work or your account is locked, contact your placement cell (students) or the ONE operator who issued your account — the assistant cannot reset passwords."
+     },
+     {
+      "id": "navigation",
+      "personas": [
+       "all"
+      ],
+      "title": "Finding your way around",
+      "keywords": [
+       "sidebar",
+       "menu",
+       "navigate",
+       "topbar",
+       "where",
+       "find"
+      ],
+      "body": "The left sidebar lists every section of your workspace; the top bar shows your account, the Messages icon and the Notifications bell. The bell shows a count only when something actually needs your attention. Messages will hold conversations with your placement cell and recruiters once messaging launches; today it is an empty inbox by design."
+     },
+     {
+      "id": "notifications",
+      "personas": [
+       "all"
+      ],
+      "title": "Notifications",
+      "keywords": [
+       "notification",
+       "bell",
+       "alert",
+       "badge",
+       "unread"
+      ],
+      "body": "For students, notifications are derived from real account state: assessments assigned and still open, attempts in progress, and freshly published results. For institution staff, the bell summarises published assessments, completed attempts and questions awaiting review. Institution faculty and department heads can set email reminders and quiet hours under Settings; ONE does not send staff reminder emails yet."
+     },
+     {
+      "id": "privacy-data",
+      "personas": [
+       "all"
+      ],
+      "title": "Your data and privacy",
+      "keywords": [
+       "privacy",
+       "data",
+       "download",
+       "export",
+       "delete",
+       "consent",
+       "dpdp"
+      ],
+      "body": "Students can download a copy of their personal data from Settings; the export is currently a machine-readable JSON bundle. Sharing your profile with anyone is always your explicit choice. Internal readiness signals are advisory guidance for you and your institution only — they are never shown to employers and never made public."
+     },
+     {
+      "id": "getting-help",
+      "personas": [
+       "all"
+      ],
+      "title": "Getting more help",
+      "keywords": [
+       "support",
+       "help",
+       "contact",
+       "bug",
+       "issue",
+       "problem",
+       "report"
+      ],
+      "body": "If something looks broken or you are stuck beyond what this assistant can answer, report it to your placement cell (students) or to the ONE support contact your organisation was given. Include what you clicked, what you expected, and what happened instead — a screenshot helps."
+     },
+     {
+      "id": "student-profile",
+      "personas": [
+       "student"
+      ],
+      "title": "Your profile",
+      "keywords": [
+       "profile",
+       "edit",
+       "skills",
+       "projects",
+       "education",
+       "photo",
+       "update"
+      ],
+      "body": "Your profile is your living record: education, skills, projects and certifications. Keep it current — it is what your placement cell works from and what employers see when you choose to share it. Update it from the Profile section of your workspace."
+     },
+     {
+      "id": "public-profile-qr",
+      "personas": [
+       "student"
+      ],
+      "title": "Public profile and QR sharing",
+      "keywords": [
+       "public",
+       "qr",
+       "share",
+       "link",
+       "recruiter",
+       "scan"
+      ],
+      "body": "You can present a public view of your profile and share it with a QR code that a recruiter scans from your screen. Sharing is consent-based: nothing is public unless you choose to share it, and internal readiness scores are never part of the public view."
+     },
+     {
+      "id": "taking-assessments",
+      "personas": [
+       "student"
+      ],
+      "title": "Taking an assessment",
+      "keywords": [
+       "assessment",
+       "exam",
+       "test",
+       "start",
+       "attempt",
+       "timer",
+       "resume",
+       "save"
+      ],
+      "body": "Assessments are taken on a laptop or desktop only - phone screens and app switching do not mix with timed, proctored attempts. Open Assessments in your workspace to see what is assigned to you, with each assessment’s window and your attempts used. Start an attempt to get your paper; every attempt runs on its own countdown clock (the assessment’s duration), which is separate from the window in which you may start. Answers save automatically as you go, and if you lose connection you can resume the same attempt with the remaining time. Submit before the clock runs out; when it reaches zero the attempt submits itself."
+     },
+     {
+      "id": "assessment-rules",
+      "personas": [
+       "student"
+      ],
+      "title": "Assessment rules: attempts, focus and marking",
+      "keywords": [
+       "attempts",
+       "tab",
+       "switch",
+       "focus",
+       "warning",
+       "negative",
+       "marking",
+       "auto",
+       "submit",
+       "result"
+      ],
+      "body": "Each assessment allows a fixed number of attempts. Leaving the exam tab or window is recorded: you get warnings, and repeated focus loss auto-submits the attempt, so stay on the exam screen. Some questions carry negative marking, shown with the question. Results appear in the same Assessments section once published, with your score and percentage."
+     },
+     {
+      "id": "assessment-troubleshooting",
+      "personas": [
+       "student"
+      ],
+      "title": "Why can’t I start my assessment?",
+      "keywords": [
+       "cannot",
+       "start",
+       "unable",
+       "window",
+       "closed",
+       "opens",
+       "soon",
+       "expired",
+       "exhausted"
+      ],
+      "body": "If an assessment shows Opens soon, its window has not started yet. Window closed means the start window has passed. Completed with no attempts left means you used your allowance. In all three cases only your institution can help: staff can reopen the window, add attempts, or change the per-attempt duration. Ask your placement cell — the assistant cannot change assessment windows. Also note assessments are laptop-only: on a phone you will see the assignment but the start button is replaced with a laptop-only notice."
+     },
+     {
+      "id": "employer-screening-tests",
+      "personas": [
+       "student"
+      ],
+      "title": "Screening tests from employers",
+      "keywords": [
+       "screening",
+       "employer",
+       "screening test",
+       "invited",
+       "recruiter test",
+       "phone"
+      ],
+      "body": "An employer can send you a screening test once your application reaches its Assessment stage; you are told in your notifications, and it appears under Assessments (and Screening tests in the app, where you can take it). Before you start you see what it covers: how many questions, their formats, the marks, and the minutes you will have. It is one sitting; the timer runs on ONE’s server from the moment you begin and does not pause, and if the test’s window closes first you get less time. No camera, microphone or screen capture is used. Your result goes only to that employer, for that application, while you share it with them; it is not part of your academic record or learning evidence and never changes your readiness."
+     },
+     {
+      "id": "learning-lessons",
+      "personas": [
+       "student"
+      ],
+      "title": "Learning and lesson completion",
+      "keywords": [
+       "learning",
+       "lesson",
+       "complete",
+       "prerequisite",
+       "locked",
+       "module"
+      ],
+      "body": "Learning modules contain lessons that may build on each other: a lesson with prerequisites can only be completed after the lessons it depends on are completed. If Complete Lesson reports that prerequisites are not met, finish the earlier lessons in the module first, in order. Completed lessons feed your readiness evidence automatically."
+     },
+     {
+      "id": "career-readiness",
+      "personas": [
+       "student"
+      ],
+      "title": "Career readiness guidance",
+      "keywords": [
+       "readiness",
+       "career",
+       "score",
+       "roadmap",
+       "gap",
+       "next",
+       "step"
+      ],
+      "body": "Career readiness turns your completed lessons and assessments into private, advisory guidance: where you stand and what to do next. It is coaching, not a ranking — employers never see it, and it never appears on your public profile. Treat it as your personal roadmap."
+     },
+     {
+      "id": "question-bank",
+      "personas": [
+       "institution"
+      ],
+      "title": "The governed question bank",
+      "keywords": [
+       "question",
+       "bank",
+       "author",
+       "draft",
+       "review",
+       "approve",
+       "reject",
+       "archive",
+       "subject"
+      ],
+      "body": "Questions live in subjects and follow a governed lifecycle: DRAFT, then UNDER REVIEW, then APPROVED or REJECTED, with ARCHIVED at end of life. Only approved questions can enter an exam. Authoring supports objective types including single and multiple choice, true/false, numeric and fill-in-the-blank (write the blank as five underscores), each with marks and optional negative marking. Senior staff approve; authors send for review."
+     },
+     {
+      "id": "exam-build-publish",
+      "personas": [
+       "institution"
+      ],
+      "title": "Building, publishing and assigning an exam",
+      "keywords": [
+       "exam",
+       "create",
+       "build",
+       "section",
+       "pool",
+       "publish",
+       "assign",
+       "students",
+       "marks"
+      ],
+      "body": "An exam takes a title, window (start and end), per-attempt duration, attempts allowed and a section whose question pool you pick from approved questions; section marks must reconcile with the pool you selected. Publishing re-validates the pool against the live bank, so an archived question blocks publish with a named error. After publishing, assign students from your roster — each assigned student sees the exam in their own portal within the window. Every attempt gets a uniquely shuffled paper, seeded per attempt."
+     },
+     {
+      "id": "exam-reopen-results",
+      "personas": [
+       "institution"
+      ],
+      "title": "Reopening exams and reading results",
+      "keywords": [
+       "reopen",
+       "extend",
+       "duration",
+       "window",
+       "attempts",
+       "results",
+       "not",
+       "attempted",
+       "csv",
+       "average"
+      ],
+      "body": "Reopen/Extend on a published exam asks three things: extra WINDOW minutes (how much longer students may start), extra ATTEMPTS, and optionally a new per-attempt DURATION. The window and the duration are different clocks — extending the window does not lengthen each attempt. The results view lists every scored attempt, the class average, and by name the students who never attempted, so follow-up is direct. Completed data can be exported."
+     },
+     {
+      "id": "institution-operations",
+      "personas": [
+       "institution"
+      ],
+      "title": "Roster, drives and interventions",
+      "keywords": [
+       "roster",
+       "batch",
+       "department",
+       "drive",
+       "intervention",
+       "analytics",
+       "placement"
+      ],
+      "body": "The institution portal carries your student roster by department and batch, campus drives, skill interventions and analytics. Employers ask to run a role as a campus drive; it reaches your students only after your placement office approves it (the placement officer decides on the Dashboard, an administrator under Placement), and your one-offer-per-student policy, set under Settings or on the placement officer Dashboard, applies to applications through your drives. Placement statistics by department and batch, and the placement register of employers engaged and the drive calendar, are on Placement (and the placement officer Dashboard); they count only applications students chose to share with the college, stand at the end of the last full month, show any group under five as <5, and never count a student who shared nothing as unplaced. Your own drive categories, such as Dream, Core or Mass, are set under Settings and are never shown to employers or students. Assessments are assigned against active roster students. Readiness analytics are aggregate and advisory — they inform your placement work and are never exposed to employers at student level."
+     },
+     {
+      "id": "employer-roles-drives",
+      "personas": [
+       "employer"
+      ],
+      "title": "Roles and campus drives",
+      "keywords": [
+       "role",
+       "post",
+       "job",
+       "drive",
+       "campus",
+       "pipeline",
+       "applications",
+       "shortlist",
+       "offer"
+      ],
+      "body": "Post roles from the employer portal. To run a campus drive, open the role under Opportunity Detail and ask a college for one: the role reaches the students of that college only after its placement office approves, and the placement rules of the college apply to applications through the drive. Applications, shortlists and offers are tracked per role so the pipeline stays in one view. The Dashboard counts your open roles, new applicants in the last 7 days, the interviews this week, offers awaiting an answer and drives awaiting a college. Reports break applications down by role, college and drive, with time to each stage and offer acceptance; any group of fewer than 5 people reads <5, so no candidate is singled out."
+     },
+     {
+      "id": "employer-candidates",
+      "personas": [
+       "employer"
+      ],
+      "title": "Meeting candidates",
+      "keywords": [
+       "candidate",
+       "profile",
+       "verified",
+       "qr",
+       "readiness",
+       "score",
+       "screen"
+      ],
+      "body": "You meet candidates through profiles they have consented to share — current skills, projects and certifications, opened from a link or a QR code the student presents. ONE does not expose internal readiness scores to employers by design: candidates are evaluated on real evidence, and your own assessments, not on an opaque platform ranking."
+     },
+     {
+      "id": "employer-screening-assessments",
+      "personas": [
+       "employer"
+      ],
+      "title": "Screening tests for applicants",
+      "keywords": [
+       "assessment",
+       "screening",
+       "test",
+       "question bank",
+       "invite",
+       "window",
+       "results"
+      ],
+      "body": "Under Assessments you write questions into your own bank (someone other than the author approves each one), build a test from approved questions, publish it and send it to applicants who are in the Assessment stage, with a window of up to 30 days. Each candidate gets the test’s full length unless the window closes first, and ONE’s server keeps the time. Results are listed in the order candidates were sent the test, never ranked by score, and each candidate’s answers question by question appear in Candidate Detail — only while they share their application with you. Rejecting or archiving a question and closing a test ask for a reason. Your bank is yours alone: you cannot see a college’s question bank, and it cannot see yours."
+     },
+     {
+      "id": "mobile-app",
+      "personas": [
+       "all"
+      ],
+      "title": "The ONE mobile app",
+      "keywords": [
+       "app",
+       "mobile",
+       "android",
+       "phone",
+       "theme",
+       "install",
+       "sign in"
+      ],
+      "body": "The Android app signs in with the same email and password as the web. Students see their dashboard, assessments and results, learning, jobs and notifications; institution and employer staff see live monitoring dashboards; operations accounts see a view-only overview. College exams are never taken in the app - a laptop is required; screening tests an employer sends can be taken on the phone. Pick your look from six themes via the palette icon at the top of any screen. Demo accounts work only in the web pilot, not the app."
+     },
+     {
+      "id": "help-faq",
+      "personas": [
+       "all"
+      ],
+      "title": "Where to find help",
+      "keywords": [
+       "help",
+       "faq",
+       "guide",
+       "how"
+      ],
+      "body": "The Help & FAQ section lists answers for your role, and the ONE Assistant (the sparkle button) answers questions conversationally from the same guide. If neither resolves it, report the issue to your placement cell or the ONE support contact with what you clicked and what happened."
+     }
+    ]
+   }
+  }
+ }
+}

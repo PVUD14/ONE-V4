@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-interventions ai-loop" role="img" aria-label="Interventions (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiQuarter{0%{transform:none}24%,100%{transform:rotate(90deg)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-plus{animation:aiQuarter 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:12px 12px}
+}
+</style>
+<defs><mask id="mk-inte0-x" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff"/><path class="p-plus" fill="#000" d="M10.6 8Q10.6 7.5 11.1 7.5L12.9 7.5Q13.4 7.5 13.4 8L13.4 10.1Q13.4 10.6 13.9 10.6L16 10.6Q16.5 10.6 16.5 11.1L16.5 12.9Q16.5 13.4 16 13.4L13.9 13.4Q13.4 13.4 13.4 13.9L13.4 16Q13.4 16.5 12.9 16.5L11.1 16.5Q10.6 16.5 10.6 16L10.6 13.9Q10.6 13.4 10.1 13.4L8 13.4Q7.5 13.4 7.5 12.9L7.5 11.1Q7.5 10.6 8 10.6L10.1 10.6Q10.6 10.6 10.6 10.1Z"/></mask></defs><path class="f " mask="url(#mk-inte0-x)" d="M3 5Q3 3 5 3L15.5 3Q17.5 3 18.91 4.41L19.59 5.09Q21 6.5 21 8.5L21 19Q21 21 19 21L5 21Q3 21 3 19Z"/>
+</svg>

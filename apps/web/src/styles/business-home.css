@@ -1,0 +1,144 @@
+/*
+ * The Momentum business homes (re-skin phase 7): the employer's Hiring overview, the operations
+ * Platform overview and the Growth home, after the approved pages (inventory
+ * 06-screens/employer.html, operations.html, growth.html).
+ *
+ * The homes are built from the institution-home blocks (`.ih`, styles/institution-home.css); this
+ * sheet adds only what those pages have and the institution pages do not: the applicant stage
+ * climb, share rows, the leads board, the growth hero and the region list. Everything is scoped
+ * under `.bh` and uses Momentum tokens only. Colour rules: no per-role colour; the gradient only on
+ * the growth hero and the primary button; no readiness colour (`--band-*`) anywhere, because the
+ * employer page must carry no readiness at all; text on soft fills uses the -ink tokens. Motion:
+ * entrances play once on mount, inside `prefers-reduced-motion: no-preference` only.
+ */
+
+.bh .ih-sub b { color: var(--text); }
+.bh-banner { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; padding: 12px 14px; border-radius: var(--r-lg); background: var(--warn-soft); color: var(--text); font-size: 13.5px; }
+.bh-banner .one-icon { flex: none; color: var(--warn); }
+
+/* ---------- Applicant stage climb (employer) ---------- */
+.bh-climb { display: grid; grid-template-columns: repeat(var(--n, 7), minmax(0, 1fr)); gap: 10px; align-items: end; margin: 0; padding: 4px 0 0; list-style: none; }
+.bh-climb li { display: flex; flex-direction: column; min-width: 0; }
+.bh-climb-n { margin-bottom: 8px; font: 700 26px/1 var(--font-display); color: var(--text); text-align: center; font-variant-numeric: tabular-nums; }
+.bh-climb-bar { display: block; height: calc(14px + var(--h, 0) * 96px); border-radius: 10px; transform: skewX(var(--slant)); background: var(--c, var(--brand)); }
+.bh-climb li.z .bh-climb-bar { height: 10px; background: transparent; border: 1.5px dashed var(--line-2); }
+.bh-climb li.z .bh-climb-n { color: var(--text-3); }
+.bh-climb-l { margin-top: 10px; font-size: 12px; font-weight: 500; text-align: center; color: var(--text-2); }
+.bh-climb li:nth-child(1) { --c: var(--indigo); }
+.bh-climb li:nth-child(2) { --c: color-mix(in srgb, var(--indigo) 60%, var(--brand)); }
+.bh-climb li:nth-child(3) { --c: color-mix(in srgb, var(--indigo) 25%, var(--brand)); }
+.bh-climb li:nth-child(4) { --c: var(--brand); }
+.bh-climb li:nth-child(5) { --c: color-mix(in srgb, var(--brand) 65%, var(--cyan)); }
+.bh-climb li:nth-child(6) { --c: color-mix(in srgb, var(--brand) 35%, var(--cyan)); }
+.bh-climb li:nth-child(7) { --c: var(--cyan); }
+.bh-foot { display: grid; grid-template-columns: minmax(0, 1.2fr) repeat(2, minmax(0, 1fr)); gap: 10px; align-items: center; margin-top: 18px; }
+.bh-foot-t { font-size: 13px; color: var(--text-2); }
+.bh-foot-t b { font: 700 15px var(--font-display); color: var(--text); }
+
+/* ---------- Share rows (operations: people by role; growth: regions) ---------- */
+.bh-share { margin: 0; padding: 0; list-style: none; }
+.bh-share li { padding: 9px 0; }
+.bh-share-h { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 13.5px; color: var(--text-2); }
+.bh-share-h b { font: 700 15px var(--font-display); color: var(--text); font-variant-numeric: tabular-nums; }
+.bh-share-h b .small-count { color: var(--text); font-weight: 700; }
+.bh-track { position: relative; height: 7px; margin-top: 8px; border-radius: 4px; background: var(--surface-3); overflow: hidden; }
+.bh-track i { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: color-mix(in srgb, var(--brand) 75%, var(--cyan)); }
+.bh-share .sc-hatch { margin-top: 8px; }
+
+/* Cards in one grid row share its height, as on the approved pages. */
+.bh .ih-grid { align-items: stretch; }
+.bh .ih-grid > [class^="ih-c"] { display: flex; flex-direction: column; }
+.bh .ih-grid > [class^="ih-c"] > .ih-card { flex: 1; }
+/* The drive stepper in a narrow card: labels wrap inside their own column. */
+.bh .ih-steps { gap: 6px; }
+.bh .ih-steps li { font-size: 11px; line-height: 1.25; }
+
+/* ---------- Open roles table ---------- */
+.bh-drive span { display: block; margin-bottom: 4px; font-size: 12.5px; color: var(--text-2); }
+.bh .ih-table td .tag { white-space: nowrap; }
+.bh-role b { display: block; font-weight: 600; }
+.bh-role small { display: block; font-size: 12px; color: var(--text-3); }
+
+/* ---------- Message rows ---------- */
+.bh-unread { flex: none; min-width: 22px; height: 22px; padding: 0 7px; display: grid; place-items: center; border-radius: var(--r-pill); background: var(--brand-soft); color: var(--brand-ink); font: 700 11.5px var(--font-sans); }
+
+/* ---------- Locked (owner-managed) hint ---------- */
+.bh-lockbox { display: flex; gap: 12px; margin-top: 14px; padding: 14px; border-radius: var(--r-xl); border: 1px dashed var(--line-2); background: var(--surface-2); }
+.bh-lockbox .one-icon { flex: none; color: var(--text-3); margin-top: 2px; }
+.bh-lockbox b { display: block; font-size: 13.5px; color: var(--text); }
+.bh-lockbox small { display: block; margin-top: 2px; font-size: 12.5px; color: var(--text-2); }
+
+/* ---------- Growth hero ---------- */
+.bh-hero { position: relative; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: end; margin: 6px 0 18px; padding: 28px 30px; border-radius: var(--r-card); background: var(--grad); color: var(--hero-ink); box-shadow: var(--shadow); }
+.bh-hero::after { content: ''; position: absolute; inset: 0; background: var(--grad-hero-deco); pointer-events: none; }
+.bh-hero > * { position: relative; z-index: 1; min-width: 0; }
+.bh-hero-eyebrow { display: inline-flex; align-items: center; gap: 8px; font: 600 11.5px var(--font-sans); letter-spacing: .12em; text-transform: uppercase; color: var(--hero-ink); }
+.bh-hero h1 { margin: 10px 0 6px; font: 700 34px/1.1 var(--font-display); letter-spacing: -.02em; color: var(--hero-ink); }
+.bh-hero p { margin: 0; width: fit-content; max-width: 620px; font-size: 15px; color: var(--hero-ink); }
+.bh-hero p b { font-weight: 700; }
+.bh-hero-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.bh-hero-chip { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 14px; border-radius: var(--r-pill); background: rgb(10 16 48 / .32); border: 1px solid rgb(255 255 255 / .32); color: var(--hero-ink); font: 600 13px var(--font-sans); }
+.bh-hero-chip .one-icon { width: 16px; height: 16px; }
+.bh-hero-figs { display: flex; gap: 22px; }
+.bh-hero-fig { padding: 12px 16px; border-radius: var(--r-xl); background: rgb(10 16 48 / .45); }
+.bh-hero-fig b { display: block; font: 700 34px/1 var(--font-display); color: var(--hero-ink); font-variant-numeric: tabular-nums; }
+.bh-hero-fig small { display: block; margin-top: 4px; font-size: 12.5px; color: var(--hero-ink); }
+
+/* ---------- Leads board (growth) ---------- */
+.bh-board { display: grid; grid-template-columns: repeat(var(--n, 5), minmax(128px, 1fr)); gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+.bh-col { display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 10px; border-radius: var(--r-xl); background: var(--surface-2); }
+.bh-col-h { display: flex; justify-content: space-between; align-items: center; padding: 2px 2px 8px; border-bottom: 3px solid color-mix(in srgb, var(--brand) 70%, var(--cyan)); font-size: 13px; font-weight: 600; color: var(--text); }
+.bh-col-h b { font: 700 16px var(--font-display); }
+.bh-lead { padding: 10px; border-radius: var(--r-lg); background: var(--surface); border: 1px solid var(--line); }
+.bh-lead b { display: block; font-size: 13px; font-weight: 600; line-height: 1.3; color: var(--text); overflow-wrap: anywhere; }
+.bh-lead small { display: block; margin-top: 3px; font-size: 11.5px; color: var(--text-3); }
+.bh-more { padding: 2px; font-size: 12px; text-align: center; color: var(--text-3); }
+.bh-col-empty { padding: 6px 2px; font-size: 12px; color: var(--text-3); }
+
+/* ---------- Focus ---------- */
+.bh :is(.ih-lnk, .pilot-btn):focus-visible { outline: none; box-shadow: var(--ring-focus); }
+
+/* ---------- Tablet and phone ---------- */
+@media (max-width: 1180px) {
+  .bh-hero { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 720px) {
+  /* Seven stages do not fit a phone: the climb scrolls sideways rather than breaking its labels. */
+  .bh-climb { grid-template-columns: repeat(var(--n, 7), minmax(56px, 1fr)); gap: 6px; overflow-x: auto; padding-bottom: 6px; }
+  .bh-climb-n { font-size: 18px; }
+  .bh-climb-bar { height: calc(10px + var(--h, 0) * 64px); border-radius: 6px; }
+  .bh-climb-l { font-size: 10.5px; }
+  .bh .ih-steps { gap: 4px; }
+  .bh .ih-steps li { font-size: 9.5px; letter-spacing: -.01em; }
+  .bh-foot { grid-template-columns: minmax(0, 1fr); }
+  .bh-hero { padding: 22px 18px; margin-top: 0; }
+  .bh-hero h1 { font-size: 26px; }
+  .bh-hero-figs { flex-wrap: wrap; gap: 16px; }
+  .bh-hero-fig { flex: 1 1 120px; }
+  .bh-hero-fig b { font-size: 26px; }
+  .bh-board { grid-template-columns: repeat(var(--n, 5), minmax(170px, 1fr)); }
+}
+
+/* ---------- Motion (once, when in view; nothing under reduced motion) ----------
+   Cards are `.m-io` hosts (see institution-home.css). The growth hero carries the student hero's
+   ambient motion (06-screens/growth.html "hero (from student-home, energetic)"): the 12s gradient
+   drift and the 12° light sweep, paused while it is off-screen (`.m-loop`). */
+@keyframes bhGrowY { from { clip-path: inset(100% -40px -40px -40px); } to { clip-path: inset(-40px -40px -40px -40px); } }
+@keyframes bhGrowX { from { transform: scaleX(0); } }
+@keyframes bhIn { from { opacity: 0; translate: 0 8px; } }
+@keyframes bhHeroFlow { 0% { background-position: 0% 50%; } 100% { background-position: 100% 50%; } }
+@keyframes bhHeroSweep { 0% { translate: -320px 0; } 24%, 100% { translate: 1700px 0; } }
+.bh-hero { isolation: isolate; }
+.bh-hero::after { z-index: -1; }
+.bh-hflow { position: absolute; inset: 0; z-index: -2; background: var(--grad); background-size: 140% 100%; background-position: 0% 50%; pointer-events: none; }
+.bh-hero > .bh-hflow, .bh-hero > .bh-hsweep { position: absolute; z-index: -1; min-width: 0; }
+.bh-hero > .bh-hflow { z-index: -2; }
+.bh-hsweep { top: -30%; bottom: -30%; left: 0; width: 240px; background: linear-gradient(90deg, transparent, rgb(255 255 255 / .14) 50%, transparent); transform: skewX(var(--slant)); translate: -320px 0; pointer-events: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .bh-climb-bar { animation: bhGrowY var(--m-slow) var(--e-out) both; animation-delay: calc(var(--m-load, 1) * 380ms + 180ms + var(--k, 0) * 90ms); }
+  .bh-track i { transform-origin: left; animation: bhGrowX var(--m-slow) var(--e-out) both; animation-delay: calc(var(--m-load, 1) * 380ms + 220ms); }
+  .bh-lead { animation: bhIn var(--m-base) var(--e-out) both; animation-delay: calc(var(--m-load, 1) * 380ms + 180ms + var(--k, 0) * 70ms); }
+  .bh-hero { animation: ihRise var(--m-enter) var(--e-out) both 80ms; }
+  .bh-hflow { animation: bhHeroFlow var(--loop-flow) ease-in-out infinite alternate; }
+  .bh-hsweep { animation: bhHeroSweep var(--loop-sweep) var(--e-inout) infinite 2.4s; }
+}

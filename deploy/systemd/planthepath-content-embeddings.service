@@ -1,0 +1,35 @@
+# ENG-24: one run of the content embedding job (ai:content-embeddings). It embeds approved lesson text
+# through ONE AI Orchestration; with the feature off or ONE_AI_EMBEDDING_* blank it does nothing and logs why.
+# Written in the repository only — not installed on any server by the agent.
+[Unit]
+Description=ONE content embeddings (offline, approved content only)
+Documentation=https://github.com/PVUD14/planthepath-next
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=aight
+Group=aight
+WorkingDirectory=/srv/planthepath-next/current
+EnvironmentFile=/srv/planthepath-next/shared/app.env
+ExecStart=/usr/bin/env corepack pnpm --silent --filter @planthepath/persistence ai:content-embeddings
+# Exit 2 means the run stopped early (cap, switch, endpoint) and is shown as a failed unit on purpose.
+
+# A batch job on the production host: it must never starve the API or the database.
+Nice=10
+CPUQuota=50%
+MemoryMax=512M
+TimeoutStartSec=1h
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

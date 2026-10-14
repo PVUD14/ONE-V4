@@ -1,0 +1,85 @@
+/* The app's own variable names, mapped onto the Momentum tokens in ./tokens.css.
+ * Existing rules keep using --muted, --student, --p-blue and the rest, and pick up the
+ * approved look in both themes without each rule being rewritten. This is the only place
+ * those names get a value: styles.css and pilot.css no longer define them.
+ *
+ * The selector list matches every place tokens.css sets a theme (:root, an explicit
+ * [data-theme], .t-light, .t-dark), so a var() here is resolved against the theme in
+ * force on that element and never against a stale parent value.
+ *
+ * Names the app shares with Momentum and uses with the same meaning (--surface, --line,
+ * --shadow) are deliberately NOT re-declared: tokens.css owns them in both themes.
+ */
+:root, [data-theme], .t-light, .t-dark {
+  /* Surfaces, lines, text */
+  --canvas: var(--bg);
+  --line-strong: var(--line-2);
+  --muted: var(--text-3);
+  --ink: var(--text);
+  --ink-2: var(--text-2);
+
+  /* Status colours. --green is a fill; text on a success fill uses --ok-ink (decision log). */
+  --green: var(--ok);
+  --red: var(--danger);
+  --amber: var(--warn);
+  /* No purple in Momentum and no per-role accents: the old purple folds into the brand family. */
+  --purple: var(--indigo);
+
+  /* Shape and elevation */
+  --radius: var(--r-card);
+  --soft-shadow: var(--shadow);
+
+  /* Spacing (the app's 7-step scale; step 7 was 32px) */
+  --space-1: var(--sp-1);
+  --space-2: var(--sp-2);
+  --space-3: var(--sp-3);
+  --space-4: var(--sp-4);
+  --space-5: var(--sp-5);
+  --space-6: var(--sp-6);
+  --space-7: var(--sp-8);
+
+  /* Type */
+  --text-body: var(--fs-body);
+  --text-meta: var(--fs-caption);
+  --text-label: var(--fs-label);
+  --weight-body: var(--fw-body);
+  --weight-label: var(--fw-label);
+  --weight-action: var(--fw-title-sm);
+  --weight-title: var(--fw-h4);
+  --weight-display: var(--fw-h1);
+
+  /* The student brand set is the Momentum brand set */
+  --student: var(--brand);
+  --student-deep: var(--brand-ink);
+  --student-ink: var(--text);
+  --student-soft: var(--brand-soft);
+
+  /* Rule 5: no per-role accent colours. Every role-accent-* class resolves to brand. */
+  --role-accent: var(--brand);
+  --role-soft: var(--brand-soft);
+
+  /* The pilot design system's set. Text-weight colours map to the *-ink tokens so they
+     stay at 4.5:1 or better on their own soft fills in both themes. */
+  --p-blue: var(--brand);
+  --p-blue-soft: var(--brand-soft);
+  --p-ink: var(--text);
+  --p-text: var(--text);
+  --p-ink-2: var(--text-2);
+  --p-muted: var(--text-3);
+  --p-line: var(--line);
+  --p-canvas: var(--bg);
+  --p-card: var(--surface);
+  --p-green: var(--ok-ink);
+  --p-green-soft: var(--ok-soft);
+  --p-amber: var(--warn);
+  --p-amber-soft: var(--warn-soft);
+  --p-purple: var(--brand-ink);
+  --p-purple-soft: var(--brand-soft);
+  --p-indigo: var(--brand-ink);
+  --p-indigo-soft: var(--brand-soft);
+  --p-rose: var(--danger);
+  --p-rose-soft: var(--danger-soft);
+  --p-teal: var(--cyan-ink);
+  --p-teal-soft: color-mix(in srgb, var(--cyan) 14%, var(--surface));
+  --p-shadow: var(--shadow);
+}

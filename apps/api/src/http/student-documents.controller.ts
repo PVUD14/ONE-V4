@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { BadRequestException, Controller, ForbiddenException, Get, Inject, Optional, Param, Post, Req, Res, ServiceUnavailableException, UnsupportedMediaTypeException, UseGuards } from '@nestjs/common';
+import { BadRequestException, ConflictException, Controller, ForbiddenException, Get, Inject, Optional, Param, Post, Req, Res, ServiceUnavailableException, UnsupportedMediaTypeException, UseGuards } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import type { PersistenceDb } from '@planthepath/persistence/src/repositories.js';
 import type { FileScanner } from '../storage/clamav.js';
@@ -62,10 +62,15 @@ export class StudentDocumentsController {
     if (!filename) throw badRequest('INVALID_FILENAME', context.correlationId);
 
     const owned = await this.db.execute(sql`
-      SELECT id FROM student_document_metadata
+      SELECT id, verification_state FROM student_document_metadata
       WHERE id = ${id}::uuid AND student_user_id = ${studentUserId}::uuid AND archived_at IS NULL
-    `) as QueryResult<{ id: string }>;
+    `) as QueryResult<{ id: string; verification_state: string }>;
     if (owned.rows.length !== 1) throw forbidden(context.correlationId);
+    // A decision covers the file it was taken on (0107). A new file goes on a new document, or, after a
+    // rejection, follows the student asking again; it never silently inherits the decision.
+    if (owned.rows[0]?.verification_state === 'VERIFIED' || owned.rows[0]?.verification_state === 'REJECTED') {
+      throw new ConflictException({ error: { code: 'DOCUMENT_VERIFICATION_DECIDED', message: 'The institution has already decided on this document, so its file cannot be replaced.', correlationId: context.correlationId } });
+    }
 
     const bytes = await readBody(request, MAX_BYTES, context.correlationId);
     if (bytes.length === 0) throw badRequest('EMPTY_FILE', context.correlationId);

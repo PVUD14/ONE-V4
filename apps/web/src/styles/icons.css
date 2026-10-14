@@ -1,0 +1,9 @@
+/* Momentum icons: base rules for the <Icon> component (src/icons/Icon.tsx).
+ * Icons are solid two-tone glyphs in currentColor. The second tone is 42%; the active
+ * state (gradient fill, set on the svg) raises it to 55%. Motion cues live in icon-motion.css. */
+.one-icon { display: inline-block; flex: 0 0 auto; overflow: visible; vertical-align: middle; }
+.one-icon * { transform-box: view-box; }
+.one-icon.is-active .s { opacity: .55; }
+.one-icon.is-active .p-turn { fill: #1E6BFF; }
+/* Expanding a collapsed rail reuses the collapse glyph, mirrored. */
+.one-icon--flip { transform: scaleX(-1); }

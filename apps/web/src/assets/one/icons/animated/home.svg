@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-home ai-loop" role="img" aria-label="Home (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiHouse{0%,27%,100%{transform:none}7%{transform:translateY(.5px) scale(1.06,.9)}15%{transform:translateY(-1.6px) scale(.96,1.06)}22%{transform:translateY(0) scale(1.02,.98)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-home{animation:aiHouse 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:12px 21px}
+}
+</style>
+<path class="f p-home" fill-rule="evenodd" d="M3 12.2Q3 10.6 4.22 9.57L10.78 4.03Q12 3 13.22 4.03L19.78 9.57Q21 10.6 21 12.2L21 19.4Q21 21 19.4 21L15 21Q13.4 21 13.72 19.43L14.28 16.77Q14.6 15.2 13 15.2L11.8 15.2Q10.2 15.2 9.88 16.77L9.32 19.43Q9 21 7.4 21L4.6 21Q3 21 3 19.4Z"/>
+</svg>

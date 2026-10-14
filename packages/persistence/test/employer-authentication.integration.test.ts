@@ -175,3 +175,49 @@ describe('employer applicant access authentication guard', () => {
     }
   });
 });
+
+describe('employer applicant access follows the organisation state (EMP-03)', () => {
+  it.each([
+    ['SUSPENDED', false],
+    ['REJECTED', true],
+    ['PENDING', true],
+    ['UNDER_REVIEW', true],
+  ] as const)('refuses a live grant while the employer is %s', async (verificationState, active) => {
+    const recruiterId = await seedUser(`recruiter-${verificationState.toLowerCase()}@example.test`);
+    const studentId = await seedUser(`student-${verificationState.toLowerCase()}@example.test`);
+    const employerId = await seedEmployer(`Employer ${verificationState}`);
+    const opportunityId = randomUUID();
+    await seedEmployerMembership({ userId: recruiterId, employerId });
+    await seedEmployerGrant({ employerId, studentUserId: studentId, opportunityId });
+    const input = { actorUserId: recruiterId, employerId, opportunityId, studentUserId: studentId, now: new Date('2026-08-16T00:00:00Z') };
+    await expect(assertEmployerApplicantAccessForAuthenticatedPrincipal(db, input)).resolves.toBeUndefined();
+
+    await pool.query('UPDATE organizations SET verification_state = $2::verification_state, active = $3 WHERE id = $1', [employerId, verificationState, active]);
+    await expect(assertEmployerApplicantAccessForAuthenticatedPrincipal(db, input)).rejects.toThrow('employer applicant access not found');
+    await expect(assertEmployerApplicantAccessForAuthenticatedPrincipal(db, { ...input, lockForMutation: true })).rejects.toThrow('employer applicant access not found');
+  });
+});
+
+describe('employer applicant access ends while the student account is in deletion (EMP-SR-02)', () => {
+  it('refuses a live grant during an open deletion request, restores it on cancellation, and refuses it once the account is deleted', async () => {
+    const recruiterId = await seedUser('recruiter-deletion@example.test');
+    const studentId = await seedUser('student-deletion@example.test');
+    const employerId = await seedEmployer('Deletion Employer');
+    const opportunityId = randomUUID();
+    await seedEmployerMembership({ userId: recruiterId, employerId });
+    await seedEmployerGrant({ employerId, studentUserId: studentId, opportunityId });
+    const input = { actorUserId: recruiterId, employerId, opportunityId, studentUserId: studentId, now: new Date('2026-08-16T00:00:00Z') };
+    await expect(assertEmployerApplicantAccessForAuthenticatedPrincipal(db, input)).resolves.toBeUndefined();
+
+    const requestId = randomUUID();
+    await pool.query(`INSERT INTO privacy_requests (id, subject_user_id, requested_by_user_id, request_type, state, deletion_scheduled_for)
+      VALUES ($1, $2, $2, 'DELETION', 'RECEIVED', now() + interval '30 days')`, [requestId, studentId]);
+    await expect(assertEmployerApplicantAccessForAuthenticatedPrincipal(db, input)).rejects.toThrow('employer applicant access not found');
+
+    await pool.query(`UPDATE privacy_requests SET state = 'CANCELLED', cancelled_at = now() WHERE id = $1`, [requestId]);
+    await expect(assertEmployerApplicantAccessForAuthenticatedPrincipal(db, input)).resolves.toBeUndefined();
+
+    await pool.query(`UPDATE users SET state = 'DELETED' WHERE id = $1`, [studentId]);
+    await expect(assertEmployerApplicantAccessForAuthenticatedPrincipal(db, input)).rejects.toThrow('employer applicant access not found');
+  });
+});

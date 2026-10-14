@@ -11,6 +11,7 @@ function isMobileDevice(): boolean {
 
 import { useEffect, useRef, useState } from 'react';
 import { V2Stat } from './dashboardsV2.js';
+import { formatDateTime } from './dates.js';
 import {
   getProtectedAccessToken,
   listStudentExams,
@@ -95,7 +96,7 @@ export function ExamAttemptPanel(): React.ReactElement | null {
     <section className="career-api-panel" aria-labelledby="exam-panel-title">
       <div className="career-api-heading">
         <div><span className="eyebrow">Institution assessments</span><h2 id="exam-panel-title">Scheduled Assessments</h2></div>
-        <span className={`career-api-state ${exams ? 'connected' : 'unavailable'}`}>{exams ? 'API-backed' : 'Loading'}</span>
+        <span className={`career-api-state ${exams ? 'connected' : 'unavailable'}`}>{exams ? 'Up to date' : 'Loading'}</span>
       </div>
       <p className="career-api-status" role="status" aria-live="polite">{status}</p>
       {result ? (
@@ -122,14 +123,14 @@ export function ExamAttemptPanel(): React.ReactElement | null {
                 <div className="exam-list-main">
                   <strong>{exam.title}</strong>
                   <small>{exam.subjectName} · {exam.assessmentKind.replace('_', ' ')} · {exam.institutionName}</small>
-                  <small>{new Date(exam.startsAt).toLocaleString()} → {new Date(exam.endsAt).toLocaleString()} · {Math.round(exam.durationSeconds / 60)} min · {exam.totalMarks} marks</small>
+                  <small>{formatDateTime(exam.startsAt)} → {formatDateTime(exam.endsAt)} · {Math.round(exam.durationSeconds / 60)} min · {exam.totalMarks} marks</small>
                 </div>
                 <div className="exam-list-side">
                   {exam.latestResult ? <span className="exam-chip done">{exam.latestResult.percentage}%</span> : null}
                   <small>{exam.attemptsUsed} / {exam.attemptsAllowed} attempts used</small>
                   {isMobileDevice() && (exam.openAttemptId || (windowOpen && attemptsLeft > 0)) ? (
                     <span className="exam-chip muted" title="Assessments are taken on a laptop or desktop only.">
-                      {exam.openAttemptId ? 'Attempt in progress — continue on your laptop; the timer keeps running.' : 'Laptop only — open one.ai8ht.pro on a laptop to start.'}
+                      {exam.openAttemptId ? 'Attempt in progress — continue on your laptop; the timer keeps running.' : 'Laptop only — open oneby8.com on a laptop to start.'}
                     </span>
                   ) : exam.openAttemptId ? (
                     <button type="button" disabled={busy} onClick={() => void start(exam.id)}>Resume Attempt</button>

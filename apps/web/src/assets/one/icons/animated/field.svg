@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-field ai-loop" role="img" aria-label="Field (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiDrop{0%,28%,100%{transform:none;opacity:1}3%{transform:translateY(-4px);opacity:0}12%{transform:translateY(.6px);opacity:1}18%{transform:translateY(-.4px)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-pin{animation:aiDrop 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:12px 19.4px}
+}
+</style>
+<path class="f p-pin" fill-rule="evenodd" d="M12.77 18.48Q12 19.4 11.23 18.48L7.16 13.61Q6.72 13.08 6.34 12.5L6.34 12.5Q5.96 11.92 5.7 11.27L5.7 11.27Q5.45 10.62 5.33 9.94L5.33 9.94Q5.22 9.25 5.24 8.56L5.24 8.56Q5.26 7.86 5.43 7.19L5.43 7.19Q5.6 6.51 5.89 5.89L5.89 5.89Q6.19 5.26 6.61 4.71L6.61 4.71Q7.03 4.15 7.56 3.7L7.56 3.7Q8.08 3.24 8.69 2.9L8.69 2.9Q9.29 2.56 9.96 2.35L9.96 2.35Q10.62 2.14 11.31 2.07L11.31 2.07Q12 2 12.69 2.07L12.69 2.07Q13.38 2.14 14.04 2.35L14.04 2.35Q14.71 2.56 15.31 2.9L15.31 2.9Q15.92 3.24 16.44 3.7L16.44 3.7Q16.97 4.15 17.39 4.71L17.39 4.71Q17.81 5.26 18.11 5.89L18.11 5.89Q18.4 6.51 18.57 7.19L18.57 7.19Q18.74 7.86 18.76 8.56L18.76 8.56Q18.78 9.25 18.67 9.94L18.67 9.94Q18.55 10.62 18.3 11.27L18.3 11.27Q18.04 11.92 17.66 12.5L17.66 12.5Q17.28 13.08 16.84 13.61ZM9.4 8.8a2.6 2.6 0 1 0 5.2 0a2.6 2.6 0 1 0 -5.2 0Z"/><g class="s"><path class="f " fill-rule="evenodd" d="M5.62 21.18Q5.78 20.4 6.58 20.4L18.18 20.4Q18.98 20.4 18.82 21.18L18.77 21.42Q18.6 22.2 17.8 22.2L6.2 22.2Q5.4 22.2 5.57 21.42Z"/></g>
+</svg>

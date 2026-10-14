@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-resources ai-loop" role="img" aria-label="Learning Resources (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiLean{0%,30%,100%{transform:none}8%,14%{transform:rotate(-12deg)}22%{transform:rotate(1.5deg)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-lean{animation:aiLean 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:18.2px 21.6px}
+}
+</style>
+<path class="f " fill-rule="evenodd" d="M2.4 4.6Q2.4 3.4 3.6 3.4L5.6 3.4Q6.8 3.4 6.8 4.6L6.8 20.4Q6.8 21.6 5.6 21.6L3.6 21.6Q2.4 21.6 2.4 20.4ZM3.5 6.9Q3.5 6.4 4 6.4L5.2 6.4Q5.7 6.4 5.7 6.9L5.7 7.5Q5.7 8 5.2 8L4 8Q3.5 8 3.5 7.5ZM3.5 17.3Q3.5 16.8 4 16.8L5.2 16.8Q5.7 16.8 5.7 17.3L5.7 17.9Q5.7 18.4 5.2 18.4L4 18.4Q3.5 18.4 3.5 17.9Z"/><g class="s"><path class="f " fill-rule="evenodd" d="M8.2 7.8Q8.2 6.6 9.4 6.6L11.2 6.6Q12.4 6.6 12.4 7.8L12.4 20.4Q12.4 21.6 11.2 21.6L9.4 21.6Q8.2 21.6 8.2 20.4Z"/></g><path class="f p-lean" fill-rule="evenodd" d="M17.38 5.27Q17.63 4.1 18.8 4.35L20.56 4.72Q21.73 4.97 21.49 6.15L18.45 20.43Q18.2 21.6 17.03 21.35L15.27 20.98Q14.09 20.73 14.34 19.55Z"/>
+</svg>

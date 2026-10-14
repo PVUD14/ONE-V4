@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-settings ai-loop" role="img" aria-label="Settings (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiKnobS{0%,26%,100%{transform:none}9%{transform:translateX(-4px)}18%{transform:translateX(.4px)}}
+@keyframes aiKnobS2{0%,26%,100%{transform:none}9%{transform:translateX(5px)}18%{transform:translateX(-.4px)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-k1{animation:aiKnobS 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:15px 7.2px}
+.ai-loop .p-k2{animation:aiKnobS2 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:8.4px 16.8px}
+}
+</style>
+<g class="s"><path class="f " fill-rule="evenodd" d="M2.6 7.2Q2.6 6.2 3.6 6.2L20.4 6.2Q21.4 6.2 21.4 7.2L21.4 7.2Q21.4 8.2 20.4 8.2L3.6 8.2Q2.6 8.2 2.6 7.2ZM2.6 16.8Q2.6 15.8 3.6 15.8L20.4 15.8Q21.4 15.8 21.4 16.8L21.4 16.8Q21.4 17.8 20.4 17.8L3.6 17.8Q2.6 17.8 2.6 16.8Z"/></g><path class="f p-k1" fill-rule="evenodd" d="M11.6 7.2a3.4 3.4 0 1 0 6.8 0a3.4 3.4 0 1 0 -6.8 0Z"/><path class="f p-k2" fill-rule="evenodd" d="M5 16.8a3.4 3.4 0 1 0 6.8 0a3.4 3.4 0 1 0 -6.8 0Z"/>
+</svg>

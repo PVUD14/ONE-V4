@@ -46,3 +46,100 @@ export function canEmployerReadApplicant(scope: EmployerApplicantScope): boolean
   if (scope.consentRevokedAt) return false;
   return true;
 }
+
+// ADR-018: Institution Analyst is not a role. Analytics-and-export is a capability
+// grantable to these two roles and to no others.
+export const institutionAnalyticsCapableRoles = ['INSTITUTION_ADMIN', 'DEPARTMENT_HEAD'] as const;
+
+export type InstitutionAnalyticsCapableRole = (typeof institutionAnalyticsCapableRoles)[number];
+
+export interface InstitutionAnalyticsScope {
+  readonly institutionId: string;
+  readonly requestedInstitutionId: string;
+  readonly role: string;
+  readonly membershipState: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'ENDED';
+  readonly analyticsCapabilityGranted: boolean;
+}
+
+export function canReadInstitutionAnalytics(scope: InstitutionAnalyticsScope): boolean {
+  if (scope.institutionId !== scope.requestedInstitutionId) return false;
+  if (scope.membershipState !== 'ACTIVE') return false;
+  // The grant is necessary but never sufficient: a role outside the capable set is
+  // denied even holding it, so a mis-set flag cannot widen a role's reach.
+  if (!institutionAnalyticsCapableRoles.includes(scope.role as InstitutionAnalyticsCapableRole)) return false;
+  return scope.analyticsCapabilityGranted;
+}
+
+// ADR-024: offer compensation is never institution-visible, per student or in
+// aggregate. Named here so an institution read path, report generator or export
+// imports the exclusion rather than remembering it.
+export const institutionForbiddenDisclosureFields = [
+  'compensation_currency',
+  'compensation_amount',
+  'compensation_period',
+] as const;
+
+export function isInstitutionForbiddenDisclosureField(field: string): boolean {
+  return institutionForbiddenDisclosureFields.includes(field as (typeof institutionForbiddenDisclosureFields)[number]);
+}
+
+// Acceptance 124 requires audit events to be searchable by authorized roles, and
+// platform control 102 places that search with platform administration. Security
+// Admin exists to hold exactly this and has had no capability until now.
+export const auditSearchRoles = ['PLATFORM_SUPER_ADMIN', 'OPERATIONS_ADMIN', 'SECURITY_ADMIN'] as const;
+
+export type AuditSearchRole = (typeof auditSearchRoles)[number];
+
+export interface AuditSearchScope {
+  readonly role: string;
+  readonly membershipState: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'ENDED';
+}
+
+/**
+ * Audit search is deliberately platform-wide rather than tenant-scoped. An
+ * investigation that stopped at an organization boundary could not follow an actor
+ * across tenants, which is the case the search exists for. Only the three roles that
+ * already carry cross-tenant authority are admitted, and a membership that is not
+ * ACTIVE never qualifies.
+ */
+export function canSearchAuditEvents(scope: AuditSearchScope): boolean {
+  if (scope.membershipState !== 'ACTIVE') return false;
+  return auditSearchRoles.includes(scope.role as AuditSearchRole);
+}
+
+export * from './institution-scope.js';
+export * from './internal-capabilities.js';
+export * from './high-risk-actions.js';
+export * from './support-desk.js';
+export * from './jobs-console.js';
+export * from './aggregate-suppression.js';
+export * from './placement-statistics.js';
+export * from './accreditation-outcomes.js';
+export * from './privacy-console.js';
+export * from './operations-overview.js';
+export * from './career-catalogue.js';
+export * from './skill-map.js';
+export * from './question-bank.js';
+export * from './lesson-editor.js';
+export * from './content-import.js';
+export * from './external-review.js';
+export * from './institution-exports.js';
+export * from './role-demand.js';
+export * from './placement-status.js';
+export * from './relationship-lifecycle.js';
+export * from './access-reviews.js';
+export * from './college-health.js';
+export * from './incidents.js';
+export * from './content-archive.js';
+export * from './ai-operations.js';
+export * from './content-factory.js';
+export * from './explain-lessons.js';
+export * from './engine-health.js';
+export * from './institution-contract.js';
+export * from './growth-roles.js';
+export * from './growth-scope.js';
+export * from './growth-leads.js';
+export * from './growth-field.js';
+export * from './growth-pipeline.js';
+export * from './growth-employer.js';
+export * from './growth-attribution.js';

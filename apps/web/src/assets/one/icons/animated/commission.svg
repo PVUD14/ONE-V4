@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-commission ai-loop" role="img" aria-label="Commission (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiPeek{0%,26%,100%{transform:none;opacity:1}5%{transform:translateY(2.2px);opacity:.15}15%{transform:translateY(-.8px);opacity:1}}
+@keyframes aiFlip{0%,20%,100%{transform:none}6%{transform:scaleX(.06)}12%{transform:scaleX(1)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-coin{animation:aiFlip 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:16.6px 7.4px}
+.ai-loop .p-cs2{animation:aiPeek 2.8s cubic-bezier(.3,.7,.3,1) 120ms infinite;transform-origin:8.6px 16px}
+}
+</style>
+<path class="f " fill-rule="evenodd" d="M2.4 19.5Q2.4 17.6 4.3 17.6L11.9 17.6Q13.8 17.6 13.8 19.5L13.8 19.5Q13.8 21.4 11.9 21.4L4.3 21.4Q2.4 21.4 2.4 19.5Z"/><g class="s"><path class="f p-cs2" fill-rule="evenodd" d="M3.4 14.5Q3.4 12.6 5.3 12.6L11.9 12.6Q13.8 12.6 13.8 14.5L13.8 14.5Q13.8 16.4 11.9 16.4L5.3 16.4Q3.4 16.4 3.4 14.5Z"/></g><path class="f p-coin" fill-rule="evenodd" d="M11.4 7.4a5.2 5.2 0 1 0 10.4 0a5.2 5.2 0 1 0 -10.4 0ZM16.57 5.19Q16.69 4.6 17.29 4.6L18.09 4.6Q18.69 4.6 18.57 5.19L17.62 9.61Q17.5 10.2 16.9 10.2L16.1 10.2Q15.5 10.2 15.62 9.61Z"/>
+</svg>

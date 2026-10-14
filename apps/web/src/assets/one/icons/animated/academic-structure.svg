@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-academic-structure ai-loop" role="img" aria-label="Academic Structure (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiPop{0%,24%,100%{transform:none}8%{transform:scale(.93)}16%{transform:scale(1.04)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-n1{animation:aiPop 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:6px 18.2px}
+.ai-loop .p-n2{animation:aiPop 2.8s cubic-bezier(.3,.7,.3,1) 90ms infinite;transform-origin:18px 18.2px}
+}
+</style>
+<path class="f " fill-rule="evenodd" d="M8.5 3.7Q8.5 2.5 9.7 2.5L14.3 2.5Q15.5 2.5 15.5 3.7L15.5 6.8Q15.5 8 14.3 8L9.7 8Q8.5 8 8.5 6.8Z"/><path class="f p-n1" fill-rule="evenodd" d="M2.5 16.7Q2.5 15.5 3.7 15.5L8.3 15.5Q9.5 15.5 9.5 16.7L9.5 19.8Q9.5 21 8.3 21L3.7 21Q2.5 21 2.5 19.8Z"/><path class="f p-n2" fill-rule="evenodd" d="M14.5 16.7Q14.5 15.5 15.7 15.5L20.3 15.5Q21.5 15.5 21.5 16.7L21.5 19.8Q21.5 21 20.3 21L15.7 21Q14.5 21 14.5 19.8Z"/><g class="s"><path class="f " fill-rule="evenodd" d="M11 8.4Q11 8 11.4 8L12.6 8Q13 8 13 8.4L13 10.4Q13 10.8 13.4 10.8L18.6 10.8Q19 10.8 19 11.2L19 15.1Q19 15.5 18.6 15.5L17.4 15.5Q17 15.5 17 15.1L17 13.2Q17 12.8 16.6 12.8L7.4 12.8Q7 12.8 7 13.2L7 15.1Q7 15.5 6.6 15.5L5.4 15.5Q5 15.5 5 15.1L5 11.2Q5 10.8 5.4 10.8L10.6 10.8Q11 10.8 11 10.4Z"/></g>
+</svg>

@@ -29,7 +29,10 @@ export type HiringRuleCode =
   | 'OPPORTUNITY_NOT_OPEN'
   | 'DEADLINE_PASSED'
   | 'OFFER_NOT_ACCEPTED'
-  | 'TERMS_ACKNOWLEDGEMENT_REQUIRED';
+  | 'TERMS_ACKNOWLEDGEMENT_REQUIRED'
+  | 'OPPORTUNITY_TRANSITION_NOT_ALLOWED'
+  // EMP-11: a campus drive action the side may not take from the drive's state.
+  | 'CAMPUS_DRIVE_TRANSITION_NOT_ALLOWED';
 
 export class HiringRuleError extends Error {
   constructor(readonly code: HiringRuleCode, message: string) {

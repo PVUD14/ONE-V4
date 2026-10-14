@@ -21,6 +21,20 @@ jobs:
             echo 'Potential private key material detected in repository content.' >&2
             exit 1
           fi
+      - name: Reject unguarded optional-chain sub-field access
+        shell: bash
+        run: |
+          set -euo pipefail
+          # `obj?.prop.map(...)` guards `obj` but not `prop`. On a partial API
+          # response the sub-field is undefined and the call throws, which has
+          # broken the student dashboard three times — each time visible only on
+          # whichever machine lost the race with the fetch. Guard the sub-field
+          # too (`obj?.prop?.map`) or default it (`(obj?.prop ?? []).map`).
+          if git grep -nE '\?\.[a-zA-Z_$][a-zA-Z0-9_$]*\.(map|filter|forEach|flatMap|reduce|some|every|find|slice|join|includes|sort|length|at)' -- 'apps/web/src/*.ts' 'apps/web/src/*.tsx' 'apps/web/src/**/*.ts' 'apps/web/src/**/*.tsx' ':!*.test.ts' ':!*.test.tsx'; then
+            echo 'Optional chain guards the object but not the sub-field; see the lines above.' >&2
+            exit 1
+          fi
+
       - name: Reject merge conflict markers
         shell: bash
         run: |

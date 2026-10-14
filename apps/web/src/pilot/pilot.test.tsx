@@ -26,13 +26,15 @@ describe('pilot experience', () => {
     expect(screen.getByText('Good morning, Arjun! 👋')).toBeInTheDocument();
     expect(screen.getByText('LEARN | PREPARE | BUILD | GROW')).toBeInTheDocument();
     // The honesty marker is always visible, and the mockup's placeholder brand is not.
-    expect(screen.getByText('Sample data')).toBeInTheDocument();
+    expect(screen.getByText('Demo — sample data')).toBeInTheDocument();
     expect(screen.queryByText(/CareerPass/)).not.toBeInTheDocument();
   });
 
-  it('keeps the story consistent: the canonical readiness number appears on the dashboard', () => {
+  it('shows readiness as the canonical advisory band, never as a number', () => {
     render(<PilotApp email="demo.student@uat.example.test" onSignOut={() => undefined} />);
-    expect(screen.getByText(pilotCanon.readinessLabel)).toBeInTheDocument();
+    expect(screen.getByText(pilotCanon.readinessBand)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Career Readiness' })).toBeInTheDocument();
+    expect(screen.queryByText(/Readiness Score/i)).not.toBeInTheDocument();
   });
 
   it('navigates across all six Tier 1 pages', () => {
@@ -107,13 +109,15 @@ describe('persona resolution and cross-portal coherence', () => {
     expect(pilotPersonaFor('demo.client@partner.example')).toBe('student');
   });
 
-  it('shows the placement officer her college, with Arjun in the roster at his real number', () => {
+  it('shows the placement officer her college, with Arjun in the roster in his real band', () => {
     render(<PilotApp email="demo.institution@uat.example.test" onSignOut={() => undefined} />);
     expect(screen.getByRole('heading', { name: 'Placement Dashboard' })).toBeInTheDocument();
-    expect(screen.getByText('Sample data')).toBeInTheDocument();
+    expect(screen.getByText('Demo — sample data')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Students' }));
-    // The same student the client met in the first demo, same readiness figure.
+    // The same student the client met in the first demo, same readiness band - and no score column.
     expect(screen.getByText('Arjun Reddy')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Readiness Band' })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Readiness' })).not.toBeInTheDocument();
     expect(screen.getByText(/Shortlisted · Zenvia Labs/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Placement Drives' }));
     expect(screen.getByRole('heading', { name: 'Placement Drives' })).toBeInTheDocument();

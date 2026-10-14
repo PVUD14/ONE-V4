@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-company ai-loop" role="img" aria-label="Company Prep (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiRise{0%,22%,100%{transform:none}4%{transform:scaleY(.05)}15%{transform:scaleY(1.08)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-anx{animation:aiRise 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:0px 21.5px}
+}
+</style>
+<path class="f " fill-rule="evenodd" d="M3.5 8.4Q3.5 7 4.79 6.46L11.71 3.54Q13 3 13 4.4L13 20.1Q13 21.5 11.6 21.5L4.9 21.5Q3.5 21.5 3.5 20.1ZM6 11.1Q6 10.6 6.5 10.6L10 10.6Q10.5 10.6 10.5 11.1L10.5 12.3Q10.5 12.8 10 12.8L6.5 12.8Q6 12.8 6 12.3ZM6 15.9Q6 15.4 6.5 15.4L10 15.4Q10.5 15.4 10.5 15.9L10.5 17.1Q10.5 17.6 10 17.6L6.5 17.6Q6 17.6 6 17.1Z"/><g class="s"><path class="f p-anx" fill-rule="evenodd" d="M14.6 10.8Q14.6 9.5 15.9 9.5L16.9 9.5Q18.2 9.5 19.12 10.42L19.68 10.98Q20.6 11.9 20.6 13.2L20.6 20.2Q20.6 21.5 19.3 21.5L15.9 21.5Q14.6 21.5 14.6 20.2Z"/></g>
+</svg>

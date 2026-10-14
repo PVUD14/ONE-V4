@@ -1,0 +1,88 @@
+/*
+ * The Lens illustrations (re-skin phase 8): the shared CSS of every illustration in
+ * assets/one/illustrations/svg, generated from the illustration kit's MOTION_CSS
+ * (inventory 03-illustrations/kit/lx-kit.js; identical in all 72 files, the 3 approved files using
+ * a subset of it) so the art can be inlined by <EmptyState> without one <style> per instance.
+ *
+ * Theming: the kit's brand tokens (--brand, --indigo, --cyan, --orange, --ok) and motion tokens
+ * come from the app's own tokens (styles/tokens.css, same values); only the kit's --lx-* set is
+ * defined here, for light and dark, following the app theme (data-theme) and the OS by default.
+ * Motion: every keyframe runs only on `.lx.go` inside `prefers-reduced-motion: no-preference`, so
+ * the static frame renders under reduced motion. <EmptyState> adds `.go` when the art is in view.
+ */
+.lx{--lx-card:#FFFFFF;--lx-edge:#DCE3EF;--lx-edge-2:#C9D3E4;--lx-edge-3:#E2E8F3;--lx-ink:#5F6987;--lx-chip:#E6EEFF;--lx-plate:rgba(30,107,255,.05);--lx-hole:#FFFFFF;--lx-shadow:rgba(10,16,48,.13);--lx-glow-a:.24;--lx-glow-b:.08;--lx-soft:.78}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]):not(.t-light) .lx{--lx-card:#18213F;--lx-edge:#2C3762;--lx-edge-2:#34406E;--lx-edge-3:#232C52;--lx-ink:#8F99BA;--lx-chip:#1B2A5C;--lx-plate:rgba(79,141,255,.08);--lx-hole:#0D1227;--lx-shadow:rgba(0,0,0,.5);--lx-glow-a:.34;--lx-glow-b:.12;--lx-soft:.6}}
+[data-theme="dark"] .lx,.t-dark .lx{--lx-card:#18213F;--lx-edge:#2C3762;--lx-edge-2:#34406E;--lx-edge-3:#232C52;--lx-ink:#8F99BA;--lx-chip:#1B2A5C;--lx-plate:rgba(79,141,255,.08);--lx-hole:#0D1227;--lx-shadow:rgba(0,0,0,.5);--lx-glow-a:.34;--lx-glow-b:.12;--lx-soft:.6}
+[data-theme="light"] .lx,.t-light .lx{--lx-card:#FFFFFF;--lx-edge:#DCE3EF;--lx-edge-2:#C9D3E4;--lx-edge-3:#E2E8F3;--lx-ink:#5F6987;--lx-chip:#E6EEFF;--lx-plate:rgba(30,107,255,.05);--lx-hole:#FFFFFF;--lx-shadow:rgba(10,16,48,.13);--lx-glow-a:.24;--lx-glow-b:.08;--lx-soft:.78}
+/* An animated illustration stays hidden until it racks in, so a below-the-fold piece never
+   flashes its final frame first (EMPTY-STATES-NOTES "Hiding before entrance"). */
+@media (prefers-reduced-motion: no-preference){.lx.lx-anim:not(.go){opacity:0}}
+
+.lx{overflow:visible;color:var(--lx-ink);display:block}
+.lx *{transform-box:view-box}
+.lx .lx-shadow{--lx-card:var(--lx-shadow);--lx-edge:transparent;opacity:.55}.lx .lx-shadow .gfill{fill:var(--lx-shadow)}
+.lx.paused,.lx.paused *{animation-play-state:paused!important}
+.lx .lx-soft{filter:blur(1.4px);opacity:var(--lx-soft,.72)}
+@keyframes lxRack{from{filter:blur(9px);opacity:0;transform:scale(.96)}60%{opacity:1}to{filter:blur(0);transform:none}}
+@keyframes lxTicks{from{transform:rotate(-26deg);opacity:0}}
+@keyframes lxDraw{from{stroke-dashoffset:1}}
+@keyframes lxFade{from{opacity:0}}
+@keyframes lxIris{from{transform:rotate(-70deg) scale(1.3);opacity:0}}
+@keyframes lxBloom{from{transform:scale(.4);opacity:0}}
+@keyframes lxPop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.05);opacity:1}100%{transform:none}}
+@keyframes lxSlant{from{transform:translate(8px,36px);opacity:0}}
+@keyframes lxRow{from{transform:translateX(48px);opacity:0}}
+@keyframes lxFile{from{transform:translate(3px,-16px);opacity:0}}
+@keyframes lxRipple{0%{transform:scale(1);opacity:.7}100%{transform:scale(1.95);opacity:0}}
+@keyframes lxBreathe{0%,100%{transform:scale(1)}50%{transform:scale(var(--sc,1.05))}}
+@keyframes lxGlow{0%,100%{opacity:1}50%{opacity:.62}}
+@keyframes lxSpin{to{transform:rotate(360deg)}}
+@keyframes lxSpinR{to{transform:rotate(-360deg)}}
+@keyframes lxFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(var(--amp,-4px))}}
+@keyframes lxTwinkle{0%,100%{transform:scale(1) rotate(0deg);opacity:1}40%{transform:scale(.55) rotate(45deg);opacity:.6}}
+@keyframes lxType{0%,56%,100%{transform:translateY(0);opacity:.38}22%{transform:translateY(-3px);opacity:1}}
+@keyframes lxBrk{0%,100%{transform:scale(1)}50%{transform:scale(.95)}}
+@keyframes lxScan{0%,30%{transform:translateX(0)}50%,80%{transform:translateX(-128px)}100%{transform:translateX(0)}}
+@keyframes lxSlot{0%,100%{opacity:1}50%{opacity:.55}}
+@keyframes lxDash{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
+@keyframes lxSig{0%,100%{opacity:.28}35%,65%{opacity:1}}
+@keyframes lxWob{0%,70%,100%{transform:rotate(0deg)}80%{transform:rotate(var(--rot,-12deg))}90%{transform:rotate(calc(var(--rot,-12deg) * -.4))}}
+@keyframes lxChev{0%{transform:translateY(8px);opacity:0}25%{opacity:1}70%,100%{transform:translateY(-14px);opacity:0}}
+@keyframes lxBlink{0%,48%{opacity:1}52%,100%{opacity:0}}
+@keyframes lxFlip{0%,78%{transform:rotate(0deg)}92%,100%{transform:rotate(180deg)}}
+@keyframes lxRippleL{0%{transform:scale(1);opacity:.6}70%,100%{transform:scale(1.9);opacity:0}}
+@keyframes lxFlow{to{stroke-dashoffset:-16}}
+@keyframes lxDrift{0%,100%{transform:translateX(0)}50%{transform:translateX(var(--dx,6px))}}
+.lx .en-ripple{opacity:0}
+@media (prefers-reduced-motion: no-preference){
+ .lx.go{animation:lxRack var(--m-focus,1100ms) var(--e-out) backwards}
+ .lx.go .en-ticks{animation:lxTicks var(--m-focus,1100ms) var(--e-out) backwards var(--d,0ms)}
+ .lx.go .en-draw{animation:lxDraw var(--dur,var(--m-slow)) var(--e-out) backwards var(--d,0ms)}
+ .lx.go .en-fade{animation:lxFade var(--dur,var(--m-base)) var(--e-out) backwards var(--d,0ms)}
+ .lx.go .en-iris{animation:lxIris var(--m-slow) var(--e-out) backwards var(--d,0ms)}
+ .lx.go .en-bloom{animation:lxBloom var(--m-enter) var(--e-settle) backwards var(--d,0ms)}
+ .lx.go .en-pop{animation:lxPop var(--m-base) var(--e-out) backwards var(--d,0ms)}
+ .lx.go .en-slant{animation:lxSlant var(--m-slow) var(--e-out) backwards var(--d,0ms)}
+ .lx.go .en-row{animation:lxRow var(--m-slow) var(--e-out) backwards var(--d,0ms)}
+ .lx.go .en-file{animation:lxFile var(--m-enter) var(--e-out) backwards var(--d,0ms)}
+ .lx.go .en-ripple{animation:lxRipple var(--m-cele) var(--e-out) var(--d,0ms)}
+ .lx.go .lp-glow{animation:lxGlow var(--loop-breathe) ease-in-out 1.6s infinite}
+ .lx.go .lp-spin{animation:lxSpin var(--lp,90s) linear infinite}
+ .lx.go .lp-spinr{animation:lxSpinR var(--lp,60s) linear infinite}
+ .lx.go .lp-breathe{animation:lxBreathe var(--lp,var(--loop-breathe)) ease-in-out 1.8s infinite}
+ .lx.go .lp-float{animation:lxFloat var(--lp,6s) ease-in-out var(--ld,2s) infinite}
+ .lx.go .lp-twinkle{animation:lxTwinkle var(--lp,var(--loop-breathe)) ease-in-out var(--ld,1.8s) infinite}
+ .lx.go .lp-type{animation:lxType var(--loop-loader) ease-in-out var(--ld,1.6s) infinite}
+ .lx.go .lp-brk{animation:lxBrk var(--loop-breathe) ease-in-out 1.8s infinite}
+ .lx.go .lp-scan{animation:lxScan var(--loop-flow) var(--e-inout) 2s infinite}
+ .lx.go .lp-slot{animation:lxSlot var(--loop-nudge) ease-in-out 2s infinite}
+ .lx.go .lp-dash{animation:lxDash var(--lp,var(--loop-breathe)) var(--e-inout) var(--ld,1.8s) infinite}
+ .lx.go .lp-sig{animation:lxSig var(--lp,var(--loop-breathe)) ease-in-out var(--ld,1.8s) infinite}
+ .lx.go .lp-wob{animation:lxWob var(--lp,var(--loop-nudge)) var(--e-out) var(--ld,2s) infinite}
+ .lx.go .lp-chev{animation:lxChev var(--lp,3s) var(--e-out) var(--ld,2s) infinite backwards}
+ .lx.go .lp-blink{animation:lxBlink 1.2s steps(1) var(--ld,1.6s) infinite}
+ .lx.go .lp-flip{animation:lxFlip var(--lp,var(--loop-nudge)) var(--e-inout) var(--ld,2s) infinite}
+ .lx.go .lp-ripple{animation:lxRippleL var(--lp,var(--loop-breathe)) var(--e-out) var(--ld,2s) infinite}
+ .lx.go .lp-flow{animation:lxFlow var(--lp,1.6s) linear var(--ld,1.8s) infinite}
+ .lx.go .lp-drift{animation:lxDrift var(--lp,var(--loop-flow)) var(--e-inout) var(--ld,2s) infinite}
+}

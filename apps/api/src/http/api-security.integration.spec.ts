@@ -31,7 +31,7 @@ let adminPool: Pool;
 let pool: Pool;
 let db: ReturnType<typeof drizzle<typeof schema>>;
 let app: INestApplication;
-const deliveredInvitations: { toEmail: string; textBody: string; invitationId: string }[] = [];
+const deliveredInvitations: { toEmail: string; subject?: string; textBody: string; invitationId: string }[] = [];
 
 beforeAll(async () => {
   adminPool = new Pool({ connectionString });
@@ -47,8 +47,8 @@ beforeAll(async () => {
 
   const moduleRef = await Test.createTestingModule({
     imports: [Phase1ApiSecurityModule.register({ verifier, identityStore, db, invitationMailSink: {
-      async send(input: { toEmail: string; textBody: string; invitationId: string }) {
-        deliveredInvitations.push({ toEmail: input.toEmail, textBody: input.textBody, invitationId: input.invitationId });
+      async send(input: { toEmail: string; subject: string; textBody: string; invitationId: string }) {
+        deliveredInvitations.push({ toEmail: input.toEmail, subject: input.subject, textBody: input.textBody, invitationId: input.invitationId });
         return { providerReference: `mailpit:${input.invitationId}` };
       },
     } })],
@@ -123,6 +123,7 @@ describe('Phase 1 API protected request path', () => {
       .get(`/api/v1/employers/${employerId}/applicant-access/${opportunityId}/${studentUserId}`)
       .expect(401);
     await request(app.getHttpServer()).get('/api/v1/career-readiness/me').expect(401);
+    await request(app.getHttpServer()).put('/api/v1/career-readiness/me/lesson-language').send({ language: 'te' }).expect(401);
     await request(app.getHttpServer()).post(`/api/v1/career-readiness/lessons/${studentUserId}/complete`).expect(401);
     await request(app.getHttpServer()).post(`/api/v1/career-readiness/assessments/${opportunityId}/attempts`).expect(401);
     await request(app.getHttpServer()).post(`/api/v1/career-readiness/attempts/${opportunityId}/submit`).expect(401);
@@ -186,6 +187,34 @@ describe('Phase 1 API protected request path', () => {
       memberships: [],
       studentRelationships: [expect.objectContaining({ institutionId, state: 'ACTIVE' })],
     });
+  });
+
+  it('reports each membership\'s own effective internal capabilities: the role baseline plus live grants', async () => {
+    const opsUserId = await seedUser('ops-context@example.test', 'sub:ops-context');
+    const granterId = await seedUser('granter-context@example.test', 'sub:granter-context');
+    const platformId = await seedOrg('PLATFORM', 'Platform');
+    const institutionId = await seedOrg('INSTITUTION', 'College C');
+    await seedMembership(opsUserId, platformId, 'OPERATIONS_ADMIN');
+    await seedMembership(opsUserId, institutionId, 'INSTITUTION_ADMIN');
+    const opsMembership = await pool.query<{ id: string }>('SELECT id FROM organization_memberships WHERE user_id = $1 AND role = $2', [opsUserId, 'OPERATIONS_ADMIN']);
+    await pool.query(
+      'INSERT INTO membership_capabilities (id,membership_id,capability,granted_by_user_id,reason_code) VALUES ($1,$2,$3,$4,$5)',
+      [randomUUID(), opsMembership.rows[0]!.id, 'CONTENT_REVIEW', granterId, 'NEW_RESPONSIBILITY'],
+    );
+
+    const response = await request(app.getHttpServer())
+      .get('/api/v1/security/context')
+      .set('Authorization', `Bearer ${signAccessToken(privateKey, { sub: 'sub:ops-context', email: 'ops-context@example.test' })}`)
+      .expect(200);
+
+    const memberships = response.body.memberships as { readonly role: string; readonly capabilities: readonly string[] }[];
+    const operations = memberships.find((membership) => membership.role === 'OPERATIONS_ADMIN')!;
+    expect(operations.capabilities).toEqual(expect.arrayContaining(['OPS_ORG_MANAGE', 'PRIVACY_REQUESTS', 'CONTENT_REVIEW']));
+    // Not held by an operations admin's baseline, and not granted here (ADR-032).
+    for (const capability of ['CATALOGUE_MANAGE', 'CONTENT_PUBLISH', 'SECURITY_ACCESS_REVIEW', 'INCIDENT_MANAGE', 'CAPABILITY_ADMIN', 'GROWTH_ADMIN']) {
+      expect(operations.capabilities).not.toContain(capability);
+    }
+    expect(memberships.find((membership) => membership.role === 'INSTITUTION_ADMIN')!.capabilities).toEqual([]);
   });
 
   it('returns the current authenticated student profile from the verified principal only', async () => {
@@ -574,6 +603,64 @@ describe('Phase 1 API protected request path', () => {
       .set('Authorization', `Bearer ${signAccessToken(privateKey, { sub: 'sub:not-ops', email: 'not-ops@example.test' })}`)
       .send({ email: 'other-admin@example.test' })
       .expect(403);
+  });
+
+  it('invites the first user of an employer as its owner and leaves existing admin invitations alone', async () => {
+    const platformId = await seedOrg('PLATFORM', 'PlanThePath Platform');
+    const opsUserId = await seedUser('ops-employer-invite@example.test', 'sub:ops-employer-invite');
+    await seedMembership(opsUserId, platformId, 'OPERATIONS_ADMIN');
+    const employerId = await seedOrg('EMPLOYER', 'Invitation Employer');
+    const opsToken = signAccessToken(privateKey, { sub: 'sub:ops-employer-invite', email: 'ops-employer-invite@example.test' });
+
+    const inviteResponse = await request(app.getHttpServer())
+      .post(`/api/v1/operations/organizations/${employerId}/initial-admin-invitations`)
+      .set('Authorization', `Bearer ${opsToken}`)
+      .send({ email: 'first.owner@example.test' })
+      .expect(201);
+    expect(inviteResponse.body.invitation).toMatchObject({ email: 'first.owner@example.test', role: 'EMPLOYER_OWNER', state: 'PENDING' });
+    const stored = await pool.query('SELECT role, scope_employer_id, scope_institution_id FROM invitations WHERE id=$1', [inviteResponse.body.invitation.id]);
+    expect(stored.rows[0]).toEqual({ role: 'EMPLOYER_OWNER', scope_employer_id: employerId, scope_institution_id: null });
+    expect(deliveredInvitations).toHaveLength(1);
+    expect(deliveredInvitations[0]!.subject).toBe('ONE employer administrator invitation');
+    const ownerToken = new URL(deliveredInvitations[0]!.textBody.match(/https?:\/\/\S+/)?.[0] ?? '').searchParams.get('token');
+    expect(ownerToken).toBeTruthy();
+
+    const ownerUserId = await seedUser('first.owner@example.test', 'sub:first-owner');
+    const ownerAuth = signAccessToken(privateKey, { sub: 'sub:first-owner', email: 'first.owner@example.test', emailVerified: true });
+    await request(app.getHttpServer())
+      .post('/api/v1/invitations/accept')
+      .set('Authorization', `Bearer ${ownerAuth}`)
+      .set('Idempotency-Key', 'first-owner-accept')
+      .send({ token: ownerToken })
+      .expect(201);
+    const ownerMembership = await pool.query('SELECT role, state, scope_employer_id FROM organization_memberships WHERE user_id=$1 AND organization_id=$2', [ownerUserId, employerId]);
+    expect(ownerMembership.rows).toEqual([{ role: 'EMPLOYER_OWNER', state: 'ACTIVE', scope_employer_id: employerId }]);
+    const ownerContext = await request(app.getHttpServer()).get('/api/v1/security/context').set('Authorization', `Bearer ${ownerAuth}`).expect(200);
+    expect(ownerContext.body.memberships).toEqual(expect.arrayContaining([expect.objectContaining({ organizationId: employerId, role: 'EMPLOYER_OWNER' })]));
+
+    // An EMPLOYER_ADMIN invitation issued before this change still accepts as EMPLOYER_ADMIN.
+    const legacyToken = 'LegacyEmployerAdminInvitation_abcdefghijklmnopqrstuvwxyz0123';
+    await db.insert(schema.invitations).values({
+      id: randomUUID(),
+      email: 'legacy.admin@example.test',
+      tokenHash: digestInvitationToken(legacyToken),
+      state: 'PENDING',
+      invitedByUserId: opsUserId,
+      organizationId: employerId,
+      role: 'EMPLOYER_ADMIN',
+      scopeOrganizationId: employerId,
+      scopeEmployerId: employerId,
+      expiresAt: new Date('2026-12-31T00:00:00Z'),
+    });
+    const legacyUserId = await seedUser('legacy.admin@example.test', 'sub:legacy-admin');
+    await request(app.getHttpServer())
+      .post('/api/v1/invitations/accept')
+      .set('Authorization', `Bearer ${signAccessToken(privateKey, { sub: 'sub:legacy-admin', email: 'legacy.admin@example.test', emailVerified: true })}`)
+      .set('Idempotency-Key', 'legacy-admin-accept')
+      .send({ token: legacyToken })
+      .expect(201);
+    const legacyMembership = await pool.query('SELECT role FROM organization_memberships WHERE user_id=$1 AND organization_id=$2', [legacyUserId, employerId]);
+    expect(legacyMembership.rows).toEqual([{ role: 'EMPLOYER_ADMIN' }]);
   });
 
   it('keeps student lifecycle under Institution Admin instead of Operations', async () => {

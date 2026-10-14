@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-organizations ai-loop" role="img" aria-label="Organizations (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiPop{0%,24%,100%{transform:none}8%{transform:scale(.93)}16%{transform:scale(1.04)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-o1{animation:aiPop 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:4.6px 5px}
+.ai-loop .p-o2{animation:aiPop 2.8s cubic-bezier(.3,.7,.3,1) 90ms infinite;transform-origin:19.4px 5px}
+.ai-loop .p-o3{animation:aiPop 2.8s cubic-bezier(.3,.7,.3,1) 180ms infinite;transform-origin:12px 20.6px}
+}
+</style>
+<g class="s"><path class="f " fill-rule="evenodd" d="M9.31 9.01Q9.74 8.58 9.31 8.16L8.21 7.05Q7.78 6.63 7.36 7.05L6.65 7.76Q6.23 8.18 6.65 8.61L7.76 9.71Q8.18 10.14 8.61 9.71ZM15.39 9.71Q15.82 10.14 16.24 9.71L17.35 8.61Q17.77 8.18 17.35 7.76L16.64 7.05Q16.22 6.63 15.79 7.05L14.69 8.16Q14.26 8.58 14.69 9.01ZM11.15 16.7Q10.9 16.7 10.9 16.95L10.9 16.95Q10.9 17.2 11.15 17.2L12.85 17.2Q13.1 17.2 13.1 16.95L13.1 16.95Q13.1 16.7 12.85 16.7Z"/></g><path class="f " fill-rule="evenodd" d="M8.6 12.4a3.4 3.4 0 1 0 6.8 0a3.4 3.4 0 1 0 -6.8 0Z"/><path class="f p-o1" fill-rule="evenodd" d="M2.1 5a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0 -5 0Z"/><path class="f p-o2" fill-rule="evenodd" d="M16.9 5a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0 -5 0Z"/><path class="f p-o3" fill-rule="evenodd" d="M9.5 20.6a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0 -5 0Z"/>
+</svg>

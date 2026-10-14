@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react';
-import { Bell, BookOpen, Briefcase, Building2, CalendarDays, ClipboardCheck, FileText, GraduationCap, Home, MapPinned, MessageSquare, Route, Search, User, Users, Video, Wrench } from 'lucide-react';
+import { Icon, type IconName } from '../icons/Icon.js';
 import './pilot.css';
-import { BrandWordmark } from '../brand.js';
+import { BrandLogo } from '../brand.js';
+import { ThemeToggle } from '../themeToggle.js';
 import { AssistantWidget } from '../assistantWidget.js';
-import { pilotCompanies, pilotPersona, pilotPopularCourses } from './pilotData.js';
+import { pilotCanon, pilotCompanies, pilotPersona, pilotPopularCourses } from './pilotData.js';
 import { pilotApplicants, pilotEmployerPersona, pilotEmployerRoles, pilotInstitutionPersona, pilotRoster } from './pilotStaffData.js';
 import {
   employerMessages, employerNotifications, institutionMessages, institutionNotifications,
@@ -35,6 +36,14 @@ import { PilotSessionProvider, usePilotSession } from './pilotSession.js';
 
 type PilotPersonaKind = 'student' | 'institution' | 'employer';
 
+/** What every pilot portal needs from whoever mounts it: the app (demo identities) or the demo site. */
+export interface PilotPortalProps {
+  readonly email: string;
+  readonly onSignOut: () => void;
+  /** The demo site has no accounts; its exit control returns to the role chooser instead. */
+  readonly signOutLabel?: string;
+}
+
 export function pilotPersonaFor(email: string): PilotPersonaKind {
   const local = email.trim().toLowerCase();
   if (local.startsWith('demo.institution') || local.startsWith('demo.placement')) return 'institution';
@@ -42,16 +51,17 @@ export function pilotPersonaFor(email: string): PilotPersonaKind {
   return 'student';
 }
 
-interface NavEntry {
+export interface NavEntry {
   readonly key: string;
   readonly label: string;
-  readonly icon: typeof Home;
+  readonly icon: IconName;
 }
 
-function ShellMain({ config, identity, onSignOut, email, children }: {
+function ShellMain({ config, identity, onSignOut, signOutLabel, email, children }: {
   readonly config: PilotShellConfig;
   readonly identity: { readonly name: string; readonly initials: string; readonly subtitle: string };
   readonly onSignOut: () => void;
+  readonly signOutLabel: string;
   readonly email: string;
   readonly children: React.ReactNode;
 }): React.ReactElement {
@@ -60,16 +70,17 @@ function ShellMain({ config, identity, onSignOut, email, children }: {
   const unread = session.notifications.filter((entry) => !entry.read).length;
   return <div className="pilot-main" onClick={fallback}>
     <header className="pilot-topbar">
-      <div className="pilot-search"><Search size={15} /> Search…</div>
+      <div className="pilot-search"><Icon name="search" size={16} /> Search…</div>
       <div className="pilot-topbar-actions">
-        <span className="pilot-sample-chip" title={`Signed in as ${email}`}>Sample data</span>
-        <button type="button" className="pilot-icon-button" aria-label="Messages"><MessageSquare size={16} /></button>
-        <button type="button" className="pilot-icon-button" aria-label="Notifications"><Bell size={16} />{unread > 0 ? <span className="pilot-dot">{unread}</span> : null}</button>
+        <span className="pilot-sample-chip" title={`Signed in as ${email}`}>Demo — sample data</span>
+        <ThemeToggle className="pilot-icon-button" />
+        <button type="button" className="pilot-icon-button" aria-label="Messages"><Icon name="message" size={16} /></button>
+        <button type="button" className="pilot-icon-button" aria-label="Notifications"><Icon name="bell" size={16} />{unread > 0 ? <span className="pilot-dot">{unread}</span> : null}</button>
         <div className="pilot-user" role="button" tabIndex={0}>
           <PilotAvatar initials={identity.initials} />
           <span><strong>{identity.name}</strong><small>{identity.subtitle}</small></span>
         </div>
-        <button type="button" className="pilot-signout" onClick={(event) => { event.stopPropagation(); onSignOut(); }}>Sign out</button>
+        <button type="button" className="pilot-signout" onClick={(event) => { event.stopPropagation(); onSignOut(); }}>{signOutLabel}</button>
       </div>
     </header>
     {children}
@@ -77,26 +88,26 @@ function ShellMain({ config, identity, onSignOut, email, children }: {
 }
 
 const STUDENT_NAV: readonly NavEntry[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: Home },
-  { key: 'roadmap', label: 'My Roadmap', icon: Route },
-  { key: 'learn', label: 'Learn', icon: BookOpen },
-  { key: 'assessments', label: 'Assessments', icon: ClipboardCheck },
-  { key: 'practice', label: 'Practice', icon: Wrench },
-  { key: 'company-prep', label: 'Company Prep', icon: Building2 },
-  { key: 'career-tools', label: 'Career Tools', icon: MapPinned },
-  { key: 'opportunities', label: 'Opportunities', icon: Briefcase },
-  { key: 'scholarships', label: 'Scholarships', icon: GraduationCap },
-  { key: 'resume', label: 'Resume Builder', icon: FileText },
-  { key: 'profile', label: 'Profile', icon: User },
+  { key: 'dashboard', label: 'Dashboard', icon: 'home' },
+  { key: 'roadmap', label: 'My Roadmap', icon: 'career' },
+  { key: 'learn', label: 'Learn', icon: 'learning' },
+  { key: 'assessments', label: 'Assessments', icon: 'assessments' },
+  { key: 'practice', label: 'Practice', icon: 'practice' },
+  { key: 'company-prep', label: 'Company Prep', icon: 'company' },
+  { key: 'career-tools', label: 'Career Tools', icon: 'tools' },
+  { key: 'opportunities', label: 'Opportunities', icon: 'opportunities' },
+  { key: 'scholarships', label: 'Scholarships', icon: 'scholarships' },
+  { key: 'resume', label: 'Resume Builder', icon: 'resume' },
+  { key: 'profile', label: 'Profile', icon: 'profile' },
 ];
 
-function StudentPilot({ email, onSignOut }: { readonly email: string; readonly onSignOut: () => void }): React.ReactElement {
+export function StudentPilot({ email, onSignOut, signOutLabel }: PilotPortalProps): React.ReactElement {
   const [page, setPage] = useState('dashboard');
   const navigate = useCallback((key: string) => setPage(key), []);
   return <PilotSessionProvider navigate={navigate} initialNotifications={studentNotifications}>
     <PilotShell
       identity={{ name: pilotPersona.name, initials: pilotPersona.initials, subtitle: pilotPersona.programme }}
-      nav={STUDENT_NAV} page={page} onNavigate={setPage} onSignOut={onSignOut} email={email}
+      nav={STUDENT_NAV} page={page} onNavigate={setPage} onSignOut={onSignOut} signOutLabel={signOutLabel} email={email}
       notifications={studentNotifications} messages={studentMessages}
       searchExtras={[
         ...pilotPopularCourses.map((course) => ({ label: course.title, detail: `Course · ${course.level}`, navKey: 'learn' })),
@@ -106,7 +117,7 @@ function StudentPilot({ email, onSignOut }: { readonly email: string; readonly o
         ['Programme', 'B.Tech CSE · Class of 2027'],
         ['Institution', pilotPersona.institution],
         ['Career goal', pilotPersona.careerGoal],
-        ['Readiness', '72 / 100 · Nearly Job Ready'],
+        ['Readiness band', `${pilotCanon.readinessBand} (advisory)`],
       ]}>
       {page === 'dashboard' ? <PilotDashboard /> : null}
       {page === 'roadmap' ? <PilotRoadmap /> : null}
@@ -123,12 +134,13 @@ function StudentPilot({ email, onSignOut }: { readonly email: string; readonly o
   </PilotSessionProvider>;
 }
 
-interface PilotShellProps {
+export interface PilotShellProps {
   readonly identity: { readonly name: string; readonly initials: string; readonly subtitle: string };
   readonly nav: readonly NavEntry[];
   readonly page: string;
   readonly onNavigate: (key: string) => void;
   readonly onSignOut: () => void;
+  readonly signOutLabel?: string | undefined;
   readonly email: string;
   readonly notifications: readonly (readonly [string, string])[];
   readonly messages: readonly (readonly [string, string])[];
@@ -137,7 +149,7 @@ interface PilotShellProps {
   readonly children: React.ReactNode;
 }
 
-function PilotShell({ identity, nav, page, onNavigate, onSignOut, email, notifications, messages, searchExtras, identityRows, children }: PilotShellProps): React.ReactElement {
+export function PilotShell({ identity, nav, page, onNavigate, onSignOut, signOutLabel = 'Sign out', email, notifications, messages, searchExtras, identityRows, children }: PilotShellProps): React.ReactElement {
   const activeLabel = nav.find((item) => item.key === page)?.label ?? page;
   const config: PilotShellConfig = {
     pageTitle: activeLabel,
@@ -159,24 +171,24 @@ function PilotShell({ identity, nav, page, onNavigate, onSignOut, email, notific
     <PilotOverlayProvider>
       <aside className="pilot-sidebar" aria-label="Pilot navigation">
         <div className="pilot-brand">
-          <BrandWordmark height={30} />
-          <span><strong>ONE</strong><small>LEARN | PREPARE | BUILD | GROW</small></span>
+          <BrandLogo width={96} />
+          <span><small>LEARN | PREPARE | BUILD | GROW</small></span>
         </div>
         {nav.map((item) => {
-          const Icon = item.icon;
+          const glyph = item.icon;
           return (
-            <button key={item.key} type="button" className={`pilot-nav-item ${page === item.key ? 'active' : ''}`}
+            <button key={item.key} type="button" className={`pilot-nav-item one-icon-host ${page === item.key ? 'active' : ''}`}
               aria-current={page === item.key ? 'page' : undefined} onClick={() => onNavigate(item.key)}>
-              <Icon size={17} /> {item.label}
+              <Icon name={glyph} size={16} active={page === item.key} animated /> {item.label}
             </button>
           );
         })}
         <div className="pilot-side-note">
-          <strong>ONE by Ai8ht</strong>
-          <p>Pilot preview environment.</p>
+          <strong>ONE by AI8HT</strong>
+          <p>Demo environment · sample data only · resets when you reload.</p>
         </div>
       </aside>
-      <ShellMain config={config} identity={identity} onSignOut={onSignOut} email={email}>
+      <ShellMain config={config} identity={identity} onSignOut={onSignOut} signOutLabel={signOutLabel} email={email}>
         {children}
       </ShellMain>
     </PilotOverlayProvider>
@@ -184,26 +196,26 @@ function PilotShell({ identity, nav, page, onNavigate, onSignOut, email, notific
 }
 
 const INSTITUTION_NAV: readonly NavEntry[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: Home },
-  { key: 'students', label: 'Students', icon: Users },
-  { key: 'drives', label: 'Placement Drives', icon: Building2 },
-  { key: 'assessments', label: 'Assessments', icon: ClipboardCheck },
-  { key: 'interventions', label: 'Interventions', icon: CalendarDays },
-  { key: 'reports', label: 'Reports', icon: FileText },
+  { key: 'dashboard', label: 'Dashboard', icon: 'home' },
+  { key: 'students', label: 'Students', icon: 'students' },
+  { key: 'drives', label: 'Placement Drives', icon: 'placement' },
+  { key: 'assessments', label: 'Assessments', icon: 'assessments' },
+  { key: 'interventions', label: 'Interventions', icon: 'interventions' },
+  { key: 'reports', label: 'Reports', icon: 'reports' },
 ];
 
-function InstitutionPilot({ email, onSignOut }: { readonly email: string; readonly onSignOut: () => void }): React.ReactElement {
+export function InstitutionPilot({ email, onSignOut, signOutLabel }: PilotPortalProps): React.ReactElement {
   const [page, setPage] = useState('dashboard');
   const navigate = useCallback((key: string) => setPage(key), []);
   return <PilotSessionProvider navigate={navigate} initialNotifications={institutionNotifications}>
     <PilotShell
-      identity={{ name: pilotInstitutionPersona.name, initials: pilotInstitutionPersona.initials, subtitle: `${pilotInstitutionPersona.role} · VIT Chennai` }}
-      nav={INSTITUTION_NAV} page={page} onNavigate={setPage} onSignOut={onSignOut} email={email}
+      identity={{ name: pilotInstitutionPersona.name, initials: pilotInstitutionPersona.initials, subtitle: `${pilotInstitutionPersona.role} · Lakeview Institute` }}
+      nav={INSTITUTION_NAV} page={page} onNavigate={setPage} onSignOut={onSignOut} signOutLabel={signOutLabel} email={email}
       notifications={institutionNotifications} messages={institutionMessages}
-      searchExtras={pilotRoster.map((student) => ({ label: student.name, detail: `Student · ${student.department} · readiness ${student.readiness}`, navKey: 'students' }))}
+      searchExtras={pilotRoster.map((student) => ({ label: student.name, detail: `Student · ${student.department} · ${student.band}`, navKey: 'students' }))}
       identityRows={[
         ['Role', pilotInstitutionPersona.role],
-        ['Institution', 'VIT Chennai'],
+        ['Institution', 'Lakeview Institute'],
         ['Cohort', '1,284 active students · 412 placement-eligible'],
         ['Season', '103 offers so far'],
       ]}>
@@ -218,21 +230,21 @@ function InstitutionPilot({ email, onSignOut }: { readonly email: string; readon
 }
 
 const EMPLOYER_NAV: readonly NavEntry[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: Home },
-  { key: 'opportunities', label: 'Opportunities', icon: Briefcase },
-  { key: 'applicants', label: 'Applicants', icon: Users },
-  { key: 'interviews', label: 'Interviews', icon: Video },
-  { key: 'offers', label: 'Offers', icon: FileText },
-  { key: 'company', label: 'Company Profile', icon: Building2 },
+  { key: 'dashboard', label: 'Dashboard', icon: 'home' },
+  { key: 'opportunities', label: 'Opportunities', icon: 'opportunities' },
+  { key: 'applicants', label: 'Applicants', icon: 'applicants' },
+  { key: 'interviews', label: 'Interviews', icon: 'interviews' },
+  { key: 'offers', label: 'Offers', icon: 'offers' },
+  { key: 'company', label: 'Company Profile', icon: 'company' },
 ];
 
-function EmployerPilot({ email, onSignOut }: { readonly email: string; readonly onSignOut: () => void }): React.ReactElement {
+export function EmployerPilot({ email, onSignOut, signOutLabel }: PilotPortalProps): React.ReactElement {
   const [page, setPage] = useState('dashboard');
   const navigate = useCallback((key: string) => setPage(key), []);
   return <PilotSessionProvider navigate={navigate} initialNotifications={employerNotifications}>
     <PilotShell
       identity={{ name: pilotEmployerPersona.name, initials: pilotEmployerPersona.initials, subtitle: pilotEmployerPersona.subtitle }}
-      nav={EMPLOYER_NAV} page={page} onNavigate={setPage} onSignOut={onSignOut} email={email}
+      nav={EMPLOYER_NAV} page={page} onNavigate={setPage} onSignOut={onSignOut} signOutLabel={signOutLabel} email={email}
       notifications={employerNotifications} messages={employerMessages}
       searchExtras={[
         ...pilotApplicants.map((applicant) => ({ label: applicant.name, detail: `Candidate · ${applicant.roleApplied}`, navKey: 'applicants' })),

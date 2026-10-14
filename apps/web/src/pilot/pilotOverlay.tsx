@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { Bell, CalendarDays, CheckCircle2, MessageSquare, Search, X } from 'lucide-react';
+import { Icon } from '../icons/Icon.js';
 import { pilotTodayPlan, pilotUpcoming } from './pilotData.js';
 
 /**
@@ -45,6 +45,14 @@ export function PilotOverlayProvider({ children }: { readonly children: React.Re
   const openModal = useCallback((next: ModalState) => setModal(next), []);
   const closeModal = useCallback(() => setModal(null), []);
 
+  // A pending toast timer outlives the provider without this. In the browser that
+  // is a state update on an unmounted tree; under test it fires after teardown and
+  // reaches for a window that no longer exists.
+  useEffect(() => () => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = null;
+  }, []);
+
   useEffect(() => {
     if (!modal) return;
     const onKey = (event: KeyboardEvent): void => { if (event.key === 'Escape') setModal(null); };
@@ -62,7 +70,7 @@ export function PilotOverlayProvider({ children }: { readonly children: React.Re
               <h2>{modal.title}</h2>
               {modal.subtitle ? <small>{modal.subtitle}</small> : null}
             </div>
-            <button type="button" className="pilot-icon-button" aria-label="Close dialog" onClick={closeModal}><X size={16} /></button>
+            <button type="button" className="pilot-icon-button" aria-label="Close dialog" onClick={closeModal}><Icon name="close" size={16} /></button>
           </div>
           <div className="pilot-modal-body">{modal.body}</div>
         </div>
@@ -137,7 +145,7 @@ export function listModal(title: string, subtitle: string, rows: readonly ListRo
     title, subtitle, body: <div className="pilot-list">
       {rows.map((row) => (
         <div key={row.title} className="pilot-list-row" style={{ padding: '9px 2px' }}>
-          <CheckCircle2 size={15} color="#1f55e5" style={{ flexShrink: 0 }} />
+          <Icon name="check" size={16} style={{ color: "#1f55e5", flexShrink: 0 }} />
           <div className="grow"><strong style={{ fontSize: 12.5 }}>{row.title}</strong>{row.detail ? <small>{row.detail}</small> : null}</div>
           {row.trailing ? <small style={{ whiteSpace: 'nowrap' }}>{row.trailing}</small> : null}
         </div>
@@ -155,7 +163,12 @@ export function downloadCsv(filename: string, rows: readonly (readonly string[])
   anchor.href = url;
   anchor.download = filename;
   anchor.click();
-  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  // Fire-and-forget by nature: the download has already started and there is no
+  // component to hang the cleanup on. Guarded so a teardown between the click and
+  // the revoke cannot turn a released object URL into an unhandled error.
+  setTimeout(() => {
+    try { URL.revokeObjectURL(url); } catch { /* the document is already gone */ }
+  }, 4000);
 }
 
 function LaunchBody({ context, action }: { readonly context: string; readonly action: string }): React.ReactElement {
@@ -215,7 +228,7 @@ function SearchBody({ config }: { readonly config: PilotShellConfig }): React.Re
       <div className="pilot-list">
         {results.map((entry) => (
           <div key={`${entry.label}-${entry.detail}`} className="pilot-list-row" style={{ padding: '8px 2px' }}>
-            <Search size={14} color="#5d6b82" style={{ flexShrink: 0 }} />
+            <Icon name="search" size={16} style={{ color: "#5d6b82", flexShrink: 0 }} />
             <div className="grow"><strong style={{ fontSize: 12.5 }}>{entry.label}</strong><small>{entry.detail}</small></div>
             {entry.navKey && config.onNavigate ? (
               <button type="button" className="pilot-btn ghost small"
@@ -237,7 +250,7 @@ function shellModal(kind: 'notifications' | 'messages' | 'search', config: Pilot
       title: 'Messages', subtitle: `${config.messages.length} conversations`, body: <div className="pilot-list">
         {config.messages.map(([from, preview]) => (
           <div key={from} className="pilot-list-row" style={{ alignItems: 'flex-start' }}>
-            <span className="pilot-tile blue"><MessageSquare size={15} /></span>
+            <span className="pilot-tile blue"><Icon name="message" size={16} /></span>
             <div className="grow"><strong>{from}</strong><small>{preview}</small></div>
           </div>
         ))}
@@ -251,7 +264,7 @@ function shellModal(kind: 'notifications' | 'messages' | 'search', config: Pilot
     title: 'Notifications', subtitle: `${config.notifications.length} unread`, body: <div className="pilot-list">
       {config.notifications.map(([text, when]) => (
         <div key={text} className="pilot-list-row" style={{ alignItems: 'flex-start' }}>
-          <span className="pilot-tile amber"><Bell size={15} /></span>
+          <span className="pilot-tile amber"><Icon name="bell" size={16} /></span>
           <div className="grow"><strong style={{ fontWeight: 600, fontSize: 12.5 }}>{text}</strong><small>{when}</small></div>
         </div>
       ))}
@@ -280,7 +293,7 @@ function modalForAction(label: string, context: string): ModalState | { readonly
     return {
       title: `Apply — ${context}`, subtitle: 'Sample application', body: <OverlayForm
         fields={[
-          { label: 'Applying as', value: 'Arjun Reddy · VIT Chennai' },
+          { label: 'Applying as', value: 'Arjun Reddy · Lakeview Institute' },
           { label: 'Resume', type: 'select', value: 'Software Engineer Resume (score 78)', options: ['Software Engineer Resume (score 78)', 'Internship Resume (score 72)', 'Campus Placement Resume (score 68)'] },
           { label: 'Cover note', type: 'textarea', placeholder: 'A short note to the recruiter (optional)' },
         ]}
@@ -291,7 +304,7 @@ function modalForAction(label: string, context: string): ModalState | { readonly
     return {
       title: `Register — ${context}`, subtitle: 'Sample registration', body: <OverlayForm
         fields={[
-          { label: 'Registering as', value: 'Arjun Reddy · VIT2027-0412' },
+          { label: 'Registering as', value: 'Arjun Reddy · LIT2027-0412' },
           { label: 'Confirmation email', type: 'email', value: 'demo.student@uat.example.test' },
         ]}
         submitLabel="Confirm Registration" success={`Registered for ${context} (sample).`} />,
@@ -337,7 +350,7 @@ function modalForAction(label: string, context: string): ModalState | { readonly
       title: "Today's Plan", subtitle: `${pilotTodayPlan.length} tasks · ${pilotTodayPlan.reduce((sum, task) => sum + task.minutes, 0)} min total`, body: <div className="pilot-list">
         {pilotTodayPlan.map((task) => (
           <div key={task.title} className="pilot-list-row" style={{ padding: '9px 2px' }}>
-            <CheckCircle2 size={15} color={task.done ? '#0d6b4f' : '#c2ccda'} style={{ flexShrink: 0 }} />
+            <Icon name="check" size={16} style={{ color: task.done ? '#0d6b4f' : '#c2ccda', flexShrink: 0 }} />
             <div className="grow"><strong style={{ fontSize: 12.5 }}>{task.title}</strong></div>
             <small>{task.minutes} min</small>
           </div>
@@ -350,7 +363,7 @@ function modalForAction(label: string, context: string): ModalState | { readonly
       title: 'Calendar', subtitle: 'Coming up this week', body: <div className="pilot-list">
         {pilotUpcoming.map((item) => (
           <div key={item.title} className="pilot-list-row">
-            <span className="pilot-tile blue"><CalendarDays size={15} /></span>
+            <span className="pilot-tile blue"><Icon name="calendar-small" size={16} /></span>
             <div className="grow"><strong>{item.title}</strong><small>{item.when}</small></div>
           </div>
         ))}
@@ -379,7 +392,7 @@ export function usePilotClickFallback(config: PilotShellConfig): (event: React.M
     if ('download' in result) {
       const filename = `${context.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-sample.csv`;
       downloadCsv(filename, [
-        ['ONE by Ai8ht — sample export', ''],
+        ['ONE by AI8HT — sample export', ''],
         ['Context', context],
         ['Generated from', 'Pilot preview (sample data only)'],
       ]);

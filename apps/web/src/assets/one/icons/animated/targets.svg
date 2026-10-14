@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-targets ai-loop" role="img" aria-label="Targets (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiFlag{0%,28%,100%{transform:none}6%{transform:skewY(-9deg) scaleX(.9)}12%{transform:skewY(6deg) scaleX(.96)}18%{transform:skewY(-3deg)}23%{transform:skewY(1deg)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-fl{animation:aiFlag 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:10px 4.3px}
+}
+</style>
+<path class="f " fill-rule="evenodd" d="M3.1 21Q1.8 21 2.52 19.92L9.08 10.08Q9.8 9 10.54 10.07L12.66 13.13Q13.4 14.2 14.19 13.17L15.21 11.83Q16 10.8 16.68 11.91L21.52 19.89Q22.2 21 20.9 21Z"/><g class="s"><path class="f p-fl" fill-rule="evenodd" d="M9 2.9Q9 2.4 9.5 2.4L15.1 2.4Q15.6 2.4 15.28 2.78L14.32 3.92Q14 4.3 14.32 4.68L15.28 5.82Q15.6 6.2 15.1 6.2L11.3 6.2Q10.8 6.2 10.8 6.7L10.8 10.1Q10.8 10.6 10.3 10.6L9.5 10.6Q9 10.6 9 10.1Z"/></g>
+</svg>

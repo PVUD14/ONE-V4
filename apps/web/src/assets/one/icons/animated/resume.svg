@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-resume ai-loop" role="img" aria-label="Resume Builder (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiLift{0%,24%,100%{transform:none}8%{transform:translateY(-1.5px) rotate(-5deg)}16%{transform:translateY(.2px) rotate(2deg)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-doc{animation:aiLift 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:12px 21.5px}
+}
+</style>
+<path class="f p-doc" fill-rule="evenodd" d="M4.4 4.1Q4.4 2.5 6 2.5L13.4 2.5Q15 2.5 16.13 3.63L18.47 5.97Q19.6 7.1 19.6 8.7L19.6 19.9Q19.6 21.5 18 21.5L6 21.5Q4.4 21.5 4.4 19.9ZM7.3 7.9a2.1 2.1 0 1 0 4.2 0a2.1 2.1 0 1 0 -4.2 0ZM7.2 13.4Q6.4 13.4 6.65 12.64L6.95 11.76Q7.2 11 8 11L10.8 11Q11.6 11 11.85 11.76L12.15 12.64Q12.4 13.4 11.6 13.4ZM7 16.1Q7 15.4 7.7 15.4L16.1 15.4Q16.8 15.4 16.8 16.1L16.8 16.5Q16.8 17.2 16.1 17.2L7.7 17.2Q7 17.2 7 16.5ZM7 18.9Q7 18.2 7.7 18.2L12.7 18.2Q13.4 18.2 13.4 18.9L13.4 19.3Q13.4 20 12.7 20L7.7 20Q7 20 7 19.3Z"/>
+</svg>

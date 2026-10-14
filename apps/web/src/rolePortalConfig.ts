@@ -1,6 +1,7 @@
-import { BarChart3, BriefcaseBusiness, Building2, CalendarDays, ClipboardCheck, FileText, Flag, Gauge, Home, LayoutDashboard, MessageSquare, PieChart, Search, Settings, ShieldCheck, Target, Users, type LucideIcon } from 'lucide-react';
+import { type IconName } from './icons/Icon.js';
+import { navIconFor } from './icons/navIcons.js';
 
-export type PortalFamily = 'Student' | 'Institution' | 'Employer' | 'Operations';
+export type PortalFamily = 'Student' | 'Institution' | 'Employer' | 'Operations' | 'Growth';
 export type EnforcementStatus = 'Backend enforced' | 'Partially backend enforced' | 'Domain-model only' | 'UI preview only';
 export type RolePortalKey =
   | 'student'
@@ -13,15 +14,41 @@ export type RolePortalKey =
   | 'recruiter'
   | 'hiring-manager'
   | 'interviewer'
-  | 'operations-admin';
+  | 'operations-admin'
+  | 'growth';
 
 export interface RoleNavItem {
   readonly key: string;
   readonly label: string;
   readonly group: string;
   readonly path: string;
-  readonly icon: LucideIcon;
+  readonly icon: IconName;
+  /** Shown only to these authenticated roles; every role when absent (GROWTH-01: Team). */
+  readonly roles?: readonly string[];
+  /**
+   * Shown only to a workspace the server reports holding at least one of these internal
+   * capabilities (ADR-032); every workspace when absent or when the server does not report.
+   */
+  readonly capabilities?: readonly string[];
 }
+
+/**
+ * The internal capabilities each Operations screen is read with, mirroring the read
+ * predicates in packages/authorization (career-catalogue.ts, content-factory.ts,
+ * skill-map.ts, question-bank.ts, lesson-editor.ts, growth-roles.ts, growth-scope.ts) and
+ * the baselines in internal-capabilities.ts. OPERATIONS_ADMIN holds none of the content
+ * capabilities by baseline: they are granted explicitly (internal-capabilities-table-design.md).
+ */
+export const operationsScreenCapabilities = {
+  /** Content Management: the catalogue, skill map, question bank, lessons, imports and reviews. */
+  contentManagement: ['CATALOGUE_MANAGE', 'CONTENT_EDIT', 'CONTENT_REVIEW', 'CONTENT_PUBLISH'],
+  accessReviews: ['SECURITY_ACCESS_REVIEW'],
+  incidents: ['INCIDENT_MANAGE'],
+  staffCapabilities: ['CAPABILITY_ADMIN'],
+  growthAdmin: ['GROWTH_ADMIN'],
+  /** OPS-10: the faculty review of assigned global drafts, granted per institution membership. */
+  externalContentReview: ['CONTENT_REVIEW_EXTERNAL'],
+} as const satisfies Readonly<Record<string, readonly string[]>>;
 
 export interface RoleFixture {
   readonly id: string;
@@ -55,25 +82,14 @@ export interface RolePortalConfig {
   readonly records: readonly RoleFixture[];
 }
 
-const iconFor = (label: string): LucideIcon => {
-  if (/student|candidate|applicant|team|users|faculty/i.test(label)) return Users;
-  if (/assessment|scorecard|evaluation|verification/i.test(label)) return ClipboardCheck;
-  if (/intervention|guidance|task|flag|safety/i.test(label)) return Target;
-  if (/opportun|requisition|offer|billing|employer|organization/i.test(label)) return BriefcaseBusiness;
-  if (/interview|calendar|session|meeting|schedule|event/i.test(label)) return CalendarDays;
-  if (/report|analysis|analytics|visual|dashboard|health/i.test(label)) return BarChart3;
-  if (/message|communication|note|support/i.test(label)) return MessageSquare;
-  if (/setting|profile|security|feature/i.test(label)) return Settings;
-  return FileText;
-};
-
 function nav(basePath: string, groups: readonly [string, readonly string[]][]): readonly RoleNavItem[] {
   return groups.flatMap(([group, labels]) => labels.map((label, index) => ({
     key: label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'dashboard',
     label,
     group,
     path: index === 0 && (label === 'Dashboard' || label === 'Overview') ? basePath : `${basePath}/${label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`,
-    icon: label === 'Dashboard' || label === 'Overview' ? Home : iconFor(label),
+    // Momentum nav icons come from the approved icon map (icons/navIcons.ts); detail pages share their parent's.
+    icon: navIconFor(label),
   })));
 }
 
@@ -111,7 +127,10 @@ export const rolePortals: readonly RolePortalConfig[] = [
   {
     key: 'placement-officer', family: 'Institution', roleName: 'Placement Officer', backendRole: 'PLACEMENT_ADMIN / PLACEMENT_OFFICER', enforcementStatus: 'Partially backend enforced', basePath: '/institution/placement-officer', subtitle: 'Institution Portal', organization: 'ABC Engineering College', previewUser: 'Anita Sharma', initials: 'AS', accent: 'emerald', dashboardTitle: 'Placement Dashboard', dashboardSummary: 'Operational placement readiness, interventions, applications and employer engagement.',
     allowedOperations: ['Coordinate interventions', 'Create assessments', 'Recommend opportunities'], readOnlyData: ['Student consent', 'Employer offer terms'], forbiddenOperations: ['Override student identity', 'Issue offers'],
-    nav: nav('/institution/placement-officer', [['Home', ['Dashboard']], ['Placement', ['Assessments', 'Help & FAQ']]]), kpis: [], records: [],
+    // Cohort and Structure are appended after the existing groups so no item that was
+    // already here changes position. The five new entries are the placement screens
+    // that run on institution data the server already authorizes for this role.
+    nav: nav('/institution/placement-officer', [['Home', ['Dashboard']], ['Placement', ['Assessments', 'Help & FAQ']], ['Cohort', ['Students', 'Student Search', 'Readiness']], ['Structure', ['Departments', 'Batches']]]), kpis: [], records: [],
   },
   {
     key: 'faculty', family: 'Institution', roleName: 'Lecturer / Faculty', backendRole: 'FACULTY_LECTURER', enforcementStatus: 'Partially backend enforced', basePath: '/institution/faculty', subtitle: 'Faculty Portal', organization: 'ABC Engineering College', previewUser: 'Dr. Meera Iyer', initials: 'MI', accent: 'blue', dashboardTitle: 'Faculty Dashboard', dashboardSummary: 'Assigned students, academic verification, assessments, tasks and interventions.',
@@ -165,11 +184,37 @@ export const rolePortals: readonly RolePortalConfig[] = [
   {
     key: 'operations-admin', family: 'Operations', roleName: 'Platform Administrator / Operations Administrator', backendRole: 'OPERATIONS_ADMIN', enforcementStatus: 'Backend enforced', basePath: '/operations/admin', subtitle: 'Operations Portal', organization: 'ONE Platform', previewUser: 'Samir Das', initials: 'SD', accent: 'slate', dashboardTitle: 'Operations Dashboard', dashboardSummary: 'Organizations, users, verification, trust queues, usage, system health, audit and feature flags.',
     allowedOperations: ['Review organization', 'Add operational note', 'Update preview queue status', 'Create support case', 'Configure preview feature flag', 'Acknowledge simulated event', 'Create saved operational view'], readOnlyData: ['Secrets', 'Production billing effects', 'Real privileged mutations'], forbiddenOperations: ['Expose tokens', 'Fake production health', 'Weaken backend authorization'],
-    nav: nav('/operations/admin', [['Home', ['Overview']], ['Organizations', ['Organizations', 'Organization Detail', 'Users', 'User Detail', 'Verification', 'Trust and Safety', 'Content Management', 'AI Operations']], ['Platform', ['Subscriptions', 'Billing', 'Analytics', 'System Health', 'Audit Logs', 'Security', 'Feature Flags', 'Support', 'Settings']]]),
+    // Content Management is offered only to a holder of a content capability: every section
+    // of it is read with one, and an operations admin holds none by baseline (ADR-032).
+    nav: nav('/operations/admin', [['Home', ['Overview']], ['Organizations', ['Organizations', 'Organization Detail', 'Users', 'User Detail', 'Verification', 'Trust and Safety', 'Content Management', 'AI Operations']], ['Platform', ['Subscriptions', 'Billing', 'Analytics', 'System Health', 'Audit Logs', 'Security', 'Feature Flags', 'Support', 'Settings']]])
+      .map((item) => (item.label === 'Content Management' ? { ...item, capabilities: operationsScreenCapabilities.contentManagement } : item)),
     kpis: [{ label: 'Total students', value: '42.8k', detail: 'Preview platform total' }, { label: 'Institutions', value: '38', detail: '7 under review' }, { label: 'Employers', value: '124', detail: '18 active campaigns' }, { label: 'Requests today', value: '18.2k', detail: 'Healthy simulated load' }],
     records: opsRecords,
   },
 ];
+
+/**
+ * GROWTH-01 (ADR-040): the Growth portal for AI8HT's partnerships field staff. Its navigation
+ * is new and approved by Divakar (HG-3, 2026-09-30) for this portal only (design §16.1).
+ * It is kept out of `rolePortals`, the demo-preview registry: it has no preview people or
+ * figures, and every page shows real rows or says plainly that it is not built yet.
+ */
+export const growthPortal: RolePortalConfig = {
+  key: 'growth', family: 'Growth', roleName: 'Growth', backendRole: 'GROWTH_EXECUTIVE / GROWTH_MANAGER', enforcementStatus: 'Backend enforced',
+  basePath: '/growth', subtitle: 'Growth Portal', organization: 'AI8HT partnerships', previewUser: '', initials: '', accent: 'teal',
+  dashboardTitle: 'Growth', dashboardSummary: 'College and employer partnerships: leads, field visits, territory, targets and commission.',
+  allowedOperations: [], readOnlyData: [], forbiddenOperations: ['Verify or approve organisations', 'See student data', 'Set rates or record payments'],
+  nav: [
+    { key: 'home', label: 'Home', group: 'Home', path: '/growth', icon: 'home' },
+    { key: 'leads', label: 'Leads', group: 'Pipeline', path: '/growth/leads', icon: 'leads' },
+    { key: 'field', label: 'Field', group: 'Pipeline', path: '/growth/field', icon: 'field' },
+    { key: 'territory', label: 'Territory', group: 'Pipeline', path: '/growth/territory', icon: 'territory' },
+    { key: 'targets', label: 'Targets', group: 'Performance', path: '/growth/targets', icon: 'targets' },
+    { key: 'commission', label: 'Commission', group: 'Performance', path: '/growth/commission', icon: 'commission' },
+    { key: 'team', label: 'Team', group: 'Performance', path: '/growth/team', icon: 'team', roles: ['GROWTH_MANAGER'] },
+  ],
+  kpis: [], records: [],
+};
 
 export const activeRolePortals = rolePortals.filter((portal) => portal.key !== 'student' && portal.key !== 'placement-officer');
 
@@ -184,14 +229,16 @@ export function rolePortalFromPath(path: string): RolePortalConfig | undefined {
   if (normalized === '/institution') return activeRolePortals.find((portal) => portal.key === 'institution-admin');
   if (normalized === '/employer') return activeRolePortals.find((portal) => portal.key === 'recruiter');
   if (normalized === '/operations') return activeRolePortals.find((portal) => portal.key === 'operations-admin');
+  if (normalized === growthPortal.basePath || normalized.startsWith(`${growthPortal.basePath}/`)) return growthPortal;
   return activeRolePortals.find((portal) => normalized === portal.basePath || normalized.startsWith(`${portal.basePath}/`));
 }
 
-export const portalFamilyIcons: Record<PortalFamily, LucideIcon> = {
-  Student: Users,
-  Institution: Building2,
-  Employer: BriefcaseBusiness,
-  Operations: ShieldCheck,
+export const portalFamilyIcons: Record<PortalFamily, IconName> = {
+  Student: 'students',
+  Institution: 'company',
+  Employer: 'opportunities',
+  Operations: 'trust-safety',
+  Growth: 'territory',
 };
 
-export const moduleIcons = { Gauge, PieChart, Search, Flag, LayoutDashboard };
+export const moduleIcons = { Gauge: 'readiness', PieChart: 'reports', Search: 'search', Flag: 'feature-flags', LayoutDashboard: 'home' } as const satisfies Record<string, IconName>;

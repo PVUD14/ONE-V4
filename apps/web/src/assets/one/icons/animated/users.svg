@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-users ai-loop" role="img" aria-label="Users (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiGrowX{0%,24%,100%{transform:none}6%{transform:scaleX(.1)}16%{transform:scaleX(1.05)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-u1{animation:aiGrowX 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:15.4px 7px}
+.ai-loop .p-u2{animation:aiGrowX 2.8s cubic-bezier(.3,.7,.3,1) 80ms infinite;transform-origin:15.4px 12px}
+.ai-loop .p-u3{animation:aiGrowX 2.8s cubic-bezier(.3,.7,.3,1) 160ms infinite;transform-origin:15.4px 17px}
+}
+</style>
+<path class="f " fill-rule="evenodd" d="M4.4 7.6a3.6 3.6 0 1 0 7.2 0a3.6 3.6 0 1 0 -7.2 0Z"/><path class="f " fill-rule="evenodd" d="M4.1 20Q2.2 20 2.67 18.16L3.33 15.64Q3.8 13.8 5.7 13.8L10.3 13.8Q12.2 13.8 12.67 15.64L13.33 18.16Q13.8 20 11.9 20Z"/><g class="s"><path class="f p-u1" fill-rule="evenodd" d="M15.7 7.18Q15.91 6.2 16.91 6.2L21.11 6.2Q22.11 6.2 21.9 7.18L21.81 7.62Q21.6 8.6 20.6 8.6L16.4 8.6Q15.4 8.6 15.61 7.62Z"/></g><g class="s"><path class="f p-u2" fill-rule="evenodd" d="M15.7 11.98Q15.91 11 16.91 11L21.11 11Q22.11 11 21.9 11.98L21.81 12.42Q21.6 13.4 20.6 13.4L16.4 13.4Q15.4 13.4 15.61 12.42Z"/></g><g class="s"><path class="f p-u3" fill-rule="evenodd" d="M15.7 16.78Q15.91 15.8 16.91 15.8L19.31 15.8Q20.31 15.8 20.1 16.78L20.01 17.22Q19.8 18.2 18.8 18.2L16.4 18.2Q15.4 18.2 15.61 17.22Z"/></g>
+</svg>

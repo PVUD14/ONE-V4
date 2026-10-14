@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-feature-flags ai-loop" role="img" aria-label="Feature Flags (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiKnobL{0%,32%,100%{transform:none}8%,22%{transform:translateX(-11.6px)}}
+@keyframes aiKnobR{0%,32%,100%{transform:none}8%,22%{transform:translateX(11.6px)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-ka{animation:aiKnobL 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:0 0}
+.ai-loop .p-kb{animation:aiKnobR 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:0 0}
+}
+</style>
+<defs><mask id="mk-feat0-x" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff"/><path class="p-ka" fill="#000" d="M15.5 7a2.3 2.3 0 1 0 4.6 0a2.3 2.3 0 1 0 -4.6 0Z"/></mask><mask id="mk-feat1-x" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff"/><path class="p-kb" fill="#000" d="M3.9 17a2.3 2.3 0 1 0 4.6 0a2.3 2.3 0 1 0 -4.6 0Z"/></mask></defs><path class="f " mask="url(#mk-feat0-x)" d="M2.4 7Q2.4 3.2 6.2 3.2L17.8 3.2Q21.6 3.2 21.6 7L21.6 7Q21.6 10.8 17.8 10.8L6.2 10.8Q2.4 10.8 2.4 7Z"/><g class="s"><path class="f " mask="url(#mk-feat1-x)" d="M2.4 17Q2.4 13.2 6.2 13.2L17.8 13.2Q21.6 13.2 21.6 17L21.6 17Q21.6 20.8 17.8 20.8L6.2 20.8Q2.4 20.8 2.4 17Z"/></g>
+</svg>

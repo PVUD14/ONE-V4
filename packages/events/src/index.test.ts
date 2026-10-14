@@ -174,4 +174,69 @@ describe('integration event envelope', () => {
       payload: { attemptId: randomUUID(), evidenceId: randomUUID(), outcomeBand: 'PROGRESSING', answers: 'raw' },
     })).toThrow(/unexpected payload field answers/);
   });
+
+  it('accepts NOT_ENOUGH_EVIDENCE as a submitted check outcome, so one attempt never has to claim a band (C3)', () => {
+    const event = createIntegrationEventEnvelope({
+      eventId: randomUUID(), eventType: 'assessment.attempt.submitted', eventVersion: 1,
+      occurredAt: '2026-08-18T00:00:00.000Z', aggregateId: randomUUID(), correlationId: 'career-readiness-event-3',
+      payload: { attemptId: randomUUID(), evidenceId: randomUUID(), outcomeBand: 'NOT_ENOUGH_EVIDENCE' },
+    });
+    expect(event.payload).toMatchObject({ outcomeBand: 'NOT_ENOUGH_EVIDENCE' });
+    expect(() => createIntegrationEventEnvelope({
+      eventId: randomUUID(), eventType: 'assessment.attempt.submitted', eventVersion: 1,
+      occurredAt: '2026-08-18T00:00:00.000Z', aggregateId: randomUUID(), correlationId: 'career-readiness-event-4',
+      payload: { attemptId: randomUUID(), evidenceId: randomUUID(), outcomeBand: 'READY' },
+    })).toThrow();
+  });
+
+  it('registers minimum-data seeded content generation lifecycle events', () => {
+    const requestId = randomUUID();
+    const contentId = randomUUID();
+    const actorId = randomUUID();
+    const requested = createIntegrationEventEnvelope({
+      eventId: randomUUID(), eventType: 'content.generation.requested', eventVersion: 1,
+      occurredAt: '2026-08-18T00:00:00.000Z', aggregateId: requestId,
+      actorId, correlationId: 'content-generation-1',
+      payload: { requestId, contentId, seedKey: 'COMPANY_RESEARCH_CHECKLIST' },
+    });
+    expect(requested).toMatchObject({ producer: 'learner-content', aggregateType: 'content_generation_request' });
+
+    expect(() => createIntegrationEventEnvelope({
+      eventId: randomUUID(), eventType: 'content.generation.completed', eventVersion: 1,
+      occurredAt: '2026-08-18T00:00:01.000Z', aggregateId: contentId,
+      actorId, correlationId: requested.correlationId, causationId: requested.eventId,
+      payload: { requestId, contentId, seedKey: 'COMPANY_RESEARCH_CHECKLIST', reviewState: 'DRAFT', source: 'SEEDED' },
+    })).not.toThrow();
+    expect(() => createIntegrationEventEnvelope({
+      eventId: randomUUID(), eventType: 'content.generation.requested', eventVersion: 1,
+      occurredAt: '2026-08-18T00:00:00.000Z', aggregateId: requestId,
+      actorId: randomUUID(), correlationId: 'content-generation-2',
+      payload: { requestId, contentId, seedKey: 'UNREGISTERED_SEED' },
+    })).toThrow(/invalid enum/);
+  });
+});
+
+describe('learner skill state projection request (ENG-05)', () => {
+  it('is registered with only the subject and a reason, so the outbox carries no learning data', () => {
+    const subjectUserId = randomUUID();
+    const event = createIntegrationEventEnvelope({
+      eventId: randomUUID(), eventType: 'learning.skill_state.projection_requested', eventVersion: 1,
+      occurredAt: '2026-09-26T00:00:00.000Z', aggregateId: subjectUserId, correlationId: 'skill-state-event-1',
+      payload: { subjectUserId, reason: 'ATTEMPTS_RECORDED' },
+    });
+    expect(event).toMatchObject({ aggregateType: 'user', purpose: 'adaptive-learning-projection', dataClassification: 'confidential' });
+    expect(eventSchemas.learningSkillStateProjectionRequestedV1.payload).toEqual({
+      subjectUserId: { kind: 'uuid' }, reason: { kind: 'enum', values: ['ATTEMPTS_RECORDED', 'CONSENT_GRANTED'] },
+    });
+    expect(() => createIntegrationEventEnvelope({
+      eventId: randomUUID(), eventType: 'learning.skill_state.projection_requested', eventVersion: 1,
+      occurredAt: '2026-09-26T00:00:00.000Z', aggregateId: subjectUserId, correlationId: 'skill-state-event-2',
+      payload: { subjectUserId, reason: 'ATTEMPTS_RECORDED', correct: true },
+    })).toThrow(EventValidationError);
+    expect(() => createIntegrationEventEnvelope({
+      eventId: randomUUID(), eventType: 'learning.skill_state.projection_requested', eventVersion: 1,
+      occurredAt: '2026-09-26T00:00:00.000Z', aggregateId: subjectUserId, correlationId: 'skill-state-event-3',
+      payload: { subjectUserId, reason: 'MANUAL_EDIT' },
+    })).toThrow(EventValidationError);
+  });
 });

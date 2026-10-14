@@ -1,4 +1,5 @@
 import type { IdentityTokenVerifier, VerifiedIdentityToken } from './cognito.js';
+import { applyStaffPoolPolicy, type StaffPoolPolicy } from './staff-pool.js';
 
 export type InternalAccountState = 'INVITED' | 'ACTIVE' | 'SUSPENDED' | 'DELETION_PENDING' | 'DELETED';
 export type MembershipState = 'ACTIVE' | 'SUSPENDED' | 'ENDED';
@@ -53,6 +54,11 @@ export interface RequestAuthorizationContext {
 
 export interface AuthorizationContextRequest {
   readonly requestedOrganizationId?: string;
+  /**
+   * ADR-025: when a staff pool is configured, staff-only memberships count only for a
+   * staff-pool token. Absent, memberships are used as loaded.
+   */
+  readonly staffPool?: StaffPoolPolicy;
 }
 
 export async function resolveAuthenticatedPrincipal(
@@ -82,8 +88,12 @@ export async function resolveAuthorizationContext(
     throw new AuthenticationBoundaryError('FORBIDDEN');
   }
 
-  const memberships = (await store.loadActiveMembershipsForUser?.(user.id) ?? [])
-    .filter((membership) => membership.userId === user.id && membership.state === 'ACTIVE');
+  const memberships = applyStaffPoolPolicy(
+    (await store.loadActiveMembershipsForUser?.(user.id) ?? [])
+      .filter((membership) => membership.userId === user.id && membership.state === 'ACTIVE'),
+    token,
+    request.staffPool,
+  );
 
   const selectedMembership = request.requestedOrganizationId
     ? requireActiveMembershipForOrganization(memberships, request.requestedOrganizationId)

@@ -1,0 +1,33 @@
+# The code sandbox's only door (ENG-12). nginx's entrypoint substitutes ${SANDBOX_TOKEN} (and only
+# variables that are set), so $http_authorization and friends stay nginx variables.
+#
+# Why this exists: Piston's own API also installs and removes runtimes and offers an interactive
+# websocket with no authentication. Only the two routes the worker needs are forwarded, and only with
+# the shared bearer token.
+
+server {
+    listen 8080;
+    server_tokens off;
+    client_max_body_size 128k;
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_set_header Upgrade "";
+    proxy_hide_header X-Powered-By;
+
+    location = /api/v2/execute {
+        if ($http_authorization != "Bearer ${SANDBOX_TOKEN}") { return 401; }
+        limit_except POST { deny all; }
+        proxy_read_timeout 30s;
+        proxy_pass http://piston:2000;
+    }
+
+    location = /api/v2/runtimes {
+        if ($http_authorization != "Bearer ${SANDBOX_TOKEN}") { return 401; }
+        limit_except GET { deny all; }
+        proxy_pass http://piston:2000;
+    }
+
+    location / {
+        return 404;
+    }
+}

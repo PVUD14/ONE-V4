@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-reports ai-loop" role="img" aria-label="Reports (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiPop{0%,24%,100%{transform:none}8%{transform:scale(.93)}16%{transform:scale(1.04)}}
+@keyframes aiWedge{0%,26%,100%{transform:none}8%{transform:translate(1.3px,-1.3px)}16%{transform:translate(-.2px,.2px)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-wedge{animation:aiWedge 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:12.6px 10.2px}
+.ai-loop .p-pie{animation:aiPop 2.8s cubic-bezier(.3,.7,.3,1) 60ms infinite;transform-origin:12px 10.8px}
+}
+</style>
+<path class="f " fill-rule="evenodd" d="M3.6 4.1Q3.6 2.5 5.2 2.5L14 2.5Q15.6 2.5 16.73 3.63L19.27 6.17Q20.4 7.3 20.4 8.9L20.4 19.9Q20.4 21.5 18.8 21.5L5.2 21.5Q3.6 21.5 3.6 19.9ZM6.6 10.8a5.4 5.4 0 1 0 10.8 0a5.4 5.4 0 1 0 -10.8 0ZM7.2 18.3Q7.2 17.6 7.9 17.6L16.1 17.6Q16.8 17.6 16.8 18.3L16.8 18.8Q16.8 19.5 16.1 19.5L7.9 19.5Q7.2 19.5 7.2 18.8Z"/><g class="s"><path class="f p-pie" fill-rule="evenodd" d="M12 10.4Q12 10.8 12.4 10.8L15.65 10.8Q16 10.8 15.97 11.15L15.97 11.15Q15.94 11.49 15.85 11.83L15.85 11.83Q15.76 12.17 15.61 12.48L15.61 12.48Q15.46 12.8 15.26 13.09L15.26 13.09Q15.06 13.37 14.82 13.62L14.82 13.62Q14.57 13.86 14.29 14.06L14.29 14.06Q14 14.26 13.68 14.41L13.68 14.41Q13.37 14.56 13.03 14.65L13.03 14.65Q12.69 14.74 12.35 14.77L12.35 14.77Q12 14.8 11.65 14.77L11.65 14.77Q11.31 14.74 10.97 14.65L10.97 14.65Q10.63 14.56 10.32 14.41L10.32 14.41Q10 14.26 9.71 14.06L9.71 14.06Q9.43 13.86 9.18 13.62L9.18 13.62Q8.94 13.37 8.74 13.09L8.74 13.09Q8.54 12.8 8.39 12.48L8.39 12.48Q8.24 12.17 8.15 11.83L8.15 11.83Q8.06 11.49 8.03 11.15L8.03 11.15Q8 10.8 8.03 10.45L8.03 10.45Q8.06 10.11 8.15 9.77L8.15 9.77Q8.24 9.43 8.39 9.12L8.39 9.12Q8.54 8.8 8.74 8.51L8.74 8.51Q8.94 8.23 9.18 7.98L9.18 7.98Q9.43 7.74 9.71 7.54L9.71 7.54Q10 7.34 10.32 7.19L10.32 7.19Q10.63 7.04 10.97 6.95L10.97 6.95Q11.31 6.86 11.65 6.83L11.65 6.83Q12 6.8 12 7.15Z"/></g><path class="f p-wedge" fill-rule="evenodd" d="M13 10.2Q12.6 10.2 12.6 9.8L12.6 6.55Q12.6 6.2 12.95 6.23L12.95 6.23Q13.29 6.26 13.63 6.35L13.63 6.35Q13.97 6.44 14.28 6.59L14.28 6.59Q14.6 6.74 14.89 6.94L14.89 6.94Q15.17 7.14 15.42 7.38L15.42 7.38Q15.66 7.63 15.86 7.91L15.86 7.91Q16.06 8.2 16.21 8.52L16.21 8.52Q16.36 8.83 16.45 9.17L16.45 9.17Q16.54 9.51 16.57 9.85L16.57 9.85Q16.6 10.2 16.25 10.2Z"/>
+</svg>

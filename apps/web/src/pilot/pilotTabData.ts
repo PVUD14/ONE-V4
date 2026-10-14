@@ -125,9 +125,9 @@ export const tabToolGroups: Readonly<Record<string, readonly string[]>> = {
 // --- Profile ------------------------------------------------------------------------
 
 export const tabEducation = [
-  { title: 'B.Tech Computer Science Engineering', detail: 'Vellore Institute of Technology, Chennai · 2023 – 2027 · CGPA 8.2' },
-  { title: 'Higher Secondary (Class XII)', detail: 'Narayana Junior College, Hyderabad · 2023 · 94.2%' },
-  { title: 'Secondary (Class X)', detail: 'Kendriya Vidyalaya, Hyderabad · 2021 · 92.8%' },
+  { title: 'B.Tech Computer Science Engineering', detail: 'Lakeview Institute of Technology, Chennai · 2023 – 2027 · CGPA 8.2' },
+  { title: 'Higher Secondary (Class XII)', detail: 'Sunrise Junior College, Hyderabad · 2023 · 94.2%' },
+  { title: 'Secondary (Class X)', detail: 'Central Public School, Hyderabad · 2021 · 92.8%' },
 ] as const;
 
 export const tabProjects = [
@@ -166,12 +166,12 @@ export const tabCategoryRoles: Readonly<Record<string, readonly string[]>> = {
 
 export const employerNotifications = [
   ['Priya Sharma confirmed Technical Round 2 for tomorrow 10:30 AM', '1h ago'],
-  ['Application volume up 32% since the VIT drive was announced', 'Today'],
+  ['Application volume up 32% since the Lakeview drive was announced', 'Today'],
   ['Offer to Sana Sheikh expires 1 Jun - consider a follow-up', 'Yesterday'],
 ] as const;
 
 export const employerMessages = [
-  ['VIT Chennai Placement Cell', 'Confirming logistics for the 22 May drive - can we lock the panel list?'],
+  ['Lakeview Placement Cell', 'Confirming logistics for the 22 May drive - can we lock the panel list?'],
   ['Leena Kapoor (Hiring Manager)', 'Shortlist for Graduate SE looks strong. Advance the top 5 to assessment.'],
 ] as const;
 
@@ -197,4 +197,3 @@ export const studentMessages = [
   ['Mentor - Kavya', 'Great progress on the SQL module. Try the practice set next.'],
 ] as const;
 
-export const remainingGoalCompanies = pilotCompanies.slice(4).map((company) => company.name);

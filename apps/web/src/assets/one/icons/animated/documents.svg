@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-documents ai-loop" role="img" aria-label="Documents (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiOpen{0%,26%,100%{transform:none}9%{transform:skewX(-14deg) scaleY(.86)}18%{transform:skewX(2deg)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-front{animation:aiOpen 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:12px 20.4px}
+}
+</style>
+<g class="s"><path class="f " fill-rule="evenodd" d="M2.5 4.8Q2.5 3.6 3.7 3.6L8 3.6Q9.2 3.6 10.05 4.45L10.55 4.95Q11.4 5.8 12.6 5.8L18.9 5.8Q19.6 5.8 19.6 6.5L19.6 6.5Q19.6 7.2 18.9 7.2L3.7 7.2Q2.5 7.2 2.5 6Z"/></g><path class="f p-front" fill-rule="evenodd" d="M2.5 10.3Q2.5 8.6 4.2 8.6L16.4 8.6Q18.1 8.6 19.3 9.8L20.3 10.8Q21.5 12 21.5 13.7L21.5 18.7Q21.5 20.4 19.8 20.4L4.2 20.4Q2.5 20.4 2.5 18.7Z"/>
+</svg>

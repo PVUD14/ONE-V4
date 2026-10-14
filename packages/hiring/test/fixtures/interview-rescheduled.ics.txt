@@ -1,0 +1,19 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//AI8HT//ONE Interviews//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+BEGIN:VEVENT
+UID:a1b2c3d4e5f60718293a4b5c6d7e8f90@one.ai8ht.pro
+SEQUENCE:1
+DTSTAMP:20990220T061500Z
+DTSTART:20990302T043000Z
+DTEND:20990302T053000Z
+SUMMARY:Interview: Robotics engineer with Acme Robotics\, Pune (Technical round)
+DESCRIPTION:Video interview (Technical round) for Robotics engineer with Acme Robotics\, Pune.\nJoin: https://meet.example.test/room-1?pwd=a\,b\nPrepare: Bring a short walkthrough of one project you built\; keep it to 10 minutes.\nSign in to ONE to see any change to this interview.
+LOCATION:https://meet.example.test/room-1?pwd=a\,b
+URL:https://meet.example.test/room-1?pwd=a,b
+STATUS:CONFIRMED
+TRANSP:OPAQUE
+END:VEVENT
+END:VCALENDAR

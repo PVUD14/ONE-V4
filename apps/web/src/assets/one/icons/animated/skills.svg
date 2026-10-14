@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-skills ai-loop" role="img" aria-label="Skills (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiBolt{0%,20%,100%{opacity:1;transform:none}4%{opacity:.3}8%{opacity:1;transform:translateY(-1.2px)}12%{opacity:.5}16%{opacity:1;transform:none}}
+@keyframes aiDashR{0%,24%,100%{transform:none;opacity:1}5%{transform:translateX(-3px);opacity:0}16%{transform:translateX(.6px);opacity:1}}
+@keyframes aiDashL{0%,24%,100%{transform:none;opacity:1}5%{transform:translateX(3px);opacity:0}16%{transform:translateX(-.6px);opacity:1}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-bolt{animation:aiBolt 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:12px 12px}
+.ai-loop .p-dr{animation:aiDashR 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:20px 16px}
+.ai-loop .p-dl{animation:aiDashL 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:4px 5px}
+}
+</style>
+<path class="f p-bolt" fill-rule="evenodd" d="M15.2 2.5Q14.4 2.5 13.88 3.11L5.39 12.92Q4.8 13.6 5.7 13.6L10.3 13.6Q11.2 13.6 10.98 14.47L9.42 20.63Q9.2 21.5 9.78 20.82L18.62 10.48Q19.2 9.8 18.3 9.8L13.7 9.8Q12.8 9.8 13.16 8.98L15.68 3.23Q16 2.5 15.2 2.5Z"/><g class="s"><path class="f p-dr" fill-rule="evenodd" d="M17.54 16.18Q17.71 15.4 18.51 15.4L21.31 15.4Q22.11 15.4 21.94 16.18L21.77 17.02Q21.6 17.8 20.8 17.8L18 17.8Q17.2 17.8 17.37 17.02Z"/><path class="f p-dl" fill-rule="evenodd" d="M2.74 4.98Q2.91 4.2 3.71 4.2L6.51 4.2Q7.31 4.2 7.14 4.98L6.97 5.82Q6.8 6.6 6 6.6L3.2 6.6Q2.4 6.6 2.57 5.82Z"/></g>
+</svg>

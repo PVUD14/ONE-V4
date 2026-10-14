@@ -1,5 +1,6 @@
-import { Bell, BookOpen, CircleHelp, BriefcaseBusiness, Building2, CalendarDays, ChevronDown, ClipboardCheck, FileText, Gauge, GraduationCap, Home, LayoutDashboard, MapPinned, Menu, MessageSquare, Search, Settings, ShieldCheck, Sparkles, Target, Trophy, UserRound, Wrench, X, type LucideIcon } from 'lucide-react';
-import { BrandWordmark } from './brand.js';
+import { Icon, type IconName } from './icons/Icon.js';
+import { BrandLogo } from './brand.js';
+import { ThemeToggle } from './themeToggle.js';
 import type { FormEvent } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -9,6 +10,8 @@ import {
   ApiRequestError,
   archiveStudentDocument,
   createStudentDocument,
+  documentVerificationLabel,
+  isDocumentVerified,
   downloadDocumentFile,
   uploadDocumentFile,
   getApiHealth,
@@ -27,7 +30,7 @@ import {
   type StudentProfileDto,
   type StudentSavedOpportunityDto,
 } from './api.js';
-import { beginHostedLogin, completeHostedLoginFromLocation, getAccessToken, getAuthStatus, getAuthDebugStatus, hasStoredAuthSession, restoreAuthenticatedSession, signInWithPassword, signOut, type AuthStatus } from './auth.js';
+import { completeHostedLoginFromLocation, getAccessToken, getAuthStatus, hasExpiredStoredSession, hasStoredAuthSession, restoreAuthenticatedSession, signInWithPassword, signOut, type AuthStatus } from './auth.js';
 import { AuthControls } from './authControls.js';
 import { PageHeader, type PageMeta } from './studentComponents.js';
 import { rolePortalFromPath } from './rolePortalConfig.js';
@@ -36,8 +39,9 @@ import { studentProfile } from './studentData.js';
 import { ApplicationsPage, AssessmentsPage, CareerPath, CoachPage, Dashboard, DocumentsPage, ExperiencePage, InterviewsPage, Learning, OpportunitiesPage, ProfilePage, ReadinessPage, SettingsPage, SkillsPage } from './studentPages.js';
 import { StudentPreviewProvider, useStudentPreview } from './studentPreviewState.js';
 import { PlacementOfficerPortal } from './staffPages.js';
-import { StudentApplicationsPage, StudentOpportunitiesPage } from './hiringPages.js';
+import { StudentApplicationsPage, StudentInterviewsPanel, StudentOpportunitiesPage } from './hiringPages.js';
 import { StudentPrivacyPanel } from './privacyPanel.js';
+import { StudentOutcomesCard } from './studentOutcomes.js';
 import { PilotApp } from './pilot/PilotApp.js';
 import { isPilotIdentity } from './pilot/pilotIdentity.js';
 import { CareerReadinessApiPanel } from './careerReadinessApiPanel.js';
@@ -46,42 +50,66 @@ import { StudentMessagesFlyout, StudentNotificationsBell } from './notifications
 import { AssistantWidget } from './assistantWidget.js';
 import { ConsentGate } from './consentGate.js';
 import { HelpFaqPanel } from './helpFaqPanel.js';
+import { CalendarPage } from './calendarPage.js';
+import { PublicProfilePage } from './publicProfilePage.js';
+import { PublicEmployerAccessPage } from './publicEmployerAccessPage.js';
+import { AuthLayout, LegalPlaceholderPage, PasswordInput } from './authLayout.js';
+import { ForgotPasswordPage } from './forgotPasswordPage.js';
+import { ShareProfilePanel } from './shareProfilePanel.js';
+import { StudentTalentPoolCard } from './talentPool.js';
+import { ScreeningAssessmentsPage } from './screeningAssessmentsPage.js';
 import { V2EmptyState, V2Stat } from './dashboardsV2.js';
 import { StudentDashboardV3 } from './studentDashboardV3.js';
+import { StudentGoalsPanel } from './studentGoals.js';
+import { StudentLearningPlan } from './studentLearning.js';
 import { StudentCareerToolsPage, StudentCompanyPrepPage, StudentPracticePage, StudentResumeBuilderPage, StudentScholarshipsPage } from './pilotParityPages.js';
-import { StudentAssessmentsV3, StudentLearningV3, StudentOpportunitiesV3, StudentProfileV3, StudentRoadmapV3 } from './parityWraps.js';
+import { StudentAssessmentsV3, StudentExplainV3, StudentLearningV3, StudentOpportunitiesV3, StudentProfileV3, StudentRoadmapV3 } from './parityWraps.js';
+import { StudentExplainPage } from './studentExplain.js';
+import { supportCodeSuffix } from './supportCode.js';
+import { formatDate } from './dates.js';
+import { roleLabel } from './labels.js';
+import { initialSidebarCollapsed, rememberSidebarCollapsed } from './sidebarPreference.js';
+import { NavIndicator } from './navIndicator.js';
+import { NoAccessPage, NotFoundPage, OfflineBanner, PageErrorBoundary, SessionExpiredPage } from './systemPages.js';
+import { EmptyState } from './momentum/emptyState.js';
 
-type RouteKey = 'dashboard' | 'career-path' | 'ai-coach' | 'readiness' | 'skills' | 'assessments' | 'learning' | 'experience' | 'opportunities' | 'applications' | 'interviews' | 'documents' | 'profile' | 'settings' | 'help' | 'practice' | 'company-prep' | 'career-tools' | 'scholarships' | 'resume-builder';
+type RouteKey = 'dashboard' | 'career-path' | 'ai-coach' | 'readiness' | 'skills' | 'assessments' | 'learning' | 'experience' | 'opportunities' | 'applications' | 'interviews' | 'documents' | 'profile' | 'settings' | 'help' | 'practice' | 'company-prep' | 'career-tools' | 'scholarships' | 'resume-builder' | 'calendar' | 'explain';
 
 interface NavItem {
   readonly label: string;
   readonly path: string;
-  readonly icon: LucideIcon;
+  readonly icon: IconName;
   readonly group: 'Plan' | 'Prepare' | 'Apply' | 'Account';
   readonly route: RouteKey;
+  /** The rail's short label, from the approved student-home rail (approved 2026-10-11). Only the
+   *  desktop rail shows it; the full label stays the accessible name, the tooltip and the drawer text. */
+  readonly short?: string;
 }
 
 const navItems: readonly NavItem[] = [
-  { label: 'Home', path: '/student', icon: Home, group: 'Plan', route: 'dashboard' },
-  { label: 'My Career', path: '/student/career-path', icon: Target, group: 'Plan', route: 'career-path' },
-  { label: 'AI Career Coach', path: '/student/ai-coach', icon: Sparkles, group: 'Plan', route: 'ai-coach' },
-  { label: 'Career Tools', path: '/student/career-tools', icon: MapPinned, group: 'Plan', route: 'career-tools' },
-  { label: 'Readiness', path: '/student/readiness', icon: Gauge, group: 'Prepare', route: 'readiness' },
-  { label: 'Skills', path: '/student/skills', icon: Sparkles, group: 'Prepare', route: 'skills' },
-  { label: 'Assessments', path: '/student/assessments', icon: ClipboardCheck, group: 'Prepare', route: 'assessments' },
-  { label: 'Learning', path: '/student/learning', icon: BookOpen, group: 'Prepare', route: 'learning' },
-  { label: 'Practice', path: '/student/practice', icon: Wrench, group: 'Prepare', route: 'practice' },
-  { label: 'Company Prep', path: '/student/company-prep', icon: Building2, group: 'Prepare', route: 'company-prep' },
-  { label: 'Experience', path: '/student/experience', icon: Trophy, group: 'Prepare', route: 'experience' },
-  { label: 'Opportunities', path: '/student/opportunities', icon: BriefcaseBusiness, group: 'Apply', route: 'opportunities' },
-  { label: 'Applications', path: '/student/applications', icon: LayoutDashboard, group: 'Apply', route: 'applications' },
-  { label: 'Interviews', path: '/student/interviews', icon: CalendarDays, group: 'Apply', route: 'interviews' },
-  { label: 'Scholarships', path: '/student/scholarships', icon: GraduationCap, group: 'Apply', route: 'scholarships' },
-  { label: 'Resume Builder', path: '/student/resume-builder', icon: FileText, group: 'Account', route: 'resume-builder' },
-  { label: 'Documents', path: '/student/documents', icon: FileText, group: 'Account', route: 'documents' },
-  { label: 'Profile', path: '/student/profile', icon: UserRound, group: 'Account', route: 'profile' },
-  { label: 'Settings', path: '/student/settings', icon: Settings, group: 'Account', route: 'settings' },
-  { label: 'Help & FAQ', path: '/student/help', icon: CircleHelp, group: 'Account', route: 'help' },
+  { label: 'Home', path: '/student', icon: 'home', group: 'Plan', route: 'dashboard' },
+  { label: 'My Career', path: '/student/career-path', icon: 'career', group: 'Plan', route: 'career-path' },
+  { label: 'AI Career Coach', short: 'AI Coach', path: '/student/ai-coach', icon: 'coach', group: 'Plan', route: 'ai-coach' },
+  { label: 'Career Tools', short: 'Tools', path: '/student/career-tools', icon: 'tools', group: 'Plan', route: 'career-tools' },
+  { label: 'Readiness', path: '/student/readiness', icon: 'readiness', group: 'Prepare', route: 'readiness' },
+  { label: 'Skills', path: '/student/skills', icon: 'skills', group: 'Prepare', route: 'skills' },
+  { label: 'Assessments', short: 'Assess', path: '/student/assessments', icon: 'assessments', group: 'Prepare', route: 'assessments' },
+  { label: 'Learning', path: '/student/learning', icon: 'learning', group: 'Prepare', route: 'learning' },
+  { label: 'Practice', path: '/student/practice', icon: 'practice', group: 'Prepare', route: 'practice' },
+  { label: 'Company Prep', short: 'Company', path: '/student/company-prep', icon: 'company', group: 'Prepare', route: 'company-prep' },
+  { label: 'Experience', path: '/student/experience', icon: 'experience', group: 'Prepare', route: 'experience' },
+  // ADR-052: appended at the end of Prepare; nothing above or below moves.
+  { label: 'Ask ONE to explain', path: '/student/explain', icon: 'coach', group: 'Prepare', route: 'explain' },
+  { label: 'Opportunities', short: 'Explore', path: '/student/opportunities', icon: 'opportunities', group: 'Apply', route: 'opportunities' },
+  { label: 'Applications', short: 'Applied', path: '/student/applications', icon: 'applications', group: 'Apply', route: 'applications' },
+  { label: 'Interviews', path: '/student/interviews', icon: 'interviews', group: 'Apply', route: 'interviews' },
+  { label: 'Calendar', path: '/student/calendar', icon: 'calendar', group: 'Apply', route: 'calendar' },
+  { label: 'Scholarships', path: '/student/scholarships', icon: 'scholarships', group: 'Apply', route: 'scholarships' },
+  { label: 'Resume Builder', path: '/student/resume-builder', icon: 'resume', group: 'Account', route: 'resume-builder' },
+  { label: 'Documents', path: '/student/documents', icon: 'documents', group: 'Account', route: 'documents' },
+  { label: 'Profile', path: '/student/profile', icon: 'profile', group: 'Account', route: 'profile' },
+  { label: 'Settings', path: '/student/settings', icon: 'settings', group: 'Account', route: 'settings' },
+  { label: 'Help & FAQ', path: '/student/help', icon: 'help', group: 'Account', route: 'help' },
 ];
 
 const routeTitles: Record<RouteKey, PageMeta> = {
@@ -91,8 +119,9 @@ const routeTitles: Record<RouteKey, PageMeta> = {
   'career-tools': { title: 'Career Tools', eyebrow: 'Plan', description: 'Everything you need to plan, build and accelerate your career.' },
   scholarships: { title: 'Scholarships', eyebrow: 'Apply', description: 'Discover and apply for scholarships to support your education journey.' },
   'resume-builder': { title: 'Resume Builder', eyebrow: 'Account', description: 'Create professional resumes that showcase your skills and land your dream job.' },
+  calendar: { title: 'Calendar', eyebrow: 'Apply', description: 'Interviews, exam windows, assigned tasks and deadlines already recorded across ONE.' },
   'career-path': { title: 'My Career Path', eyebrow: 'Target career', description: 'Milestones, skill gaps, learning, and experience needed for your goal.' },
-  'ai-coach': { title: 'AI Career Coach', eyebrow: 'Preview guidance', description: 'Explainable, non-authoritative recommendations using demo-only Student data.' },
+  'ai-coach': { title: 'AI Career Coach', eyebrow: 'Guidance', description: 'Career guidance that explains its suggestions. It advises; you decide.' },
   readiness: { title: 'Readiness', eyebrow: 'Employability model', description: 'Category scores, blockers, history, interventions, and supporting evidence.' },
   skills: { title: 'Skills', eyebrow: 'Skill profile', description: 'Claimed, evidenced, institution-verified, and assessment-verified capabilities.' },
   assessments: { title: 'Assessments', eyebrow: 'Skill checks', description: 'Scheduled, available, completed, and recommended reassessments for your goal.' },
@@ -105,9 +134,10 @@ const routeTitles: Record<RouteKey, PageMeta> = {
   profile: { title: 'Profile', eyebrow: 'Student-owned identity', description: 'Academic profile, career objective, consent, visibility, and evidence status.' },
   settings: { title: 'Settings', eyebrow: 'Account and privacy', description: 'Preferences, notifications, privacy, consent, accessibility, and security overview.' },
   help: { title: 'Help & FAQ', eyebrow: 'Guidance', description: 'Answers for students, from the same guide that powers the ONE Assistant.' },
+  explain: { title: 'Ask ONE to explain', eyebrow: 'Prepare', description: 'AI-written lessons on any topic you name — AI-generated, not checked by a person, and never counted toward anything.' },
 };
 
-const productName = 'ONE';
+const productName = 'ONE by AI8HT';
 const productTagline = 'LEARN | PREPARE | BUILD | GROW';
 const showDevelopmentIndicators = import.meta.env.DEV;
 /**
@@ -117,13 +147,19 @@ const showDevelopmentIndicators = import.meta.env.DEV;
 export function demoPortalEnabled(env: { readonly DEV: boolean; readonly VITE_ENABLE_DEMO_PORTAL?: string } = import.meta.env): boolean {
   return env.DEV || env.VITE_ENABLE_DEMO_PORTAL === 'true';
 }
-const enableDemoPortal = demoPortalEnabled();
-const protectedPortalRoots = ['/student', '/institution', '/employer', '/operations'] as const;
+// Written out rather than calling demoPortalEnabled() so the bundler sees a build-time
+// literal: with the flag off, every branch guarded by it - and the pilot's fictional
+// dataset it would pull in - is dropped from the production bundle, not merely hidden.
+// deploy/vps/Dockerfile.web proves this on every image build (scripts/check-demo-boundary.mjs).
+const enableDemoPortal = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_PORTAL === 'true';
+const protectedPortalRoots = ['/student', '/institution', '/employer', '/operations', '/growth'] as const;
 const portalChoices = [
-  { family: 'Student', path: '/student', label: 'Student', detail: 'Learning, readiness, applications and personal growth.', icon: GraduationCap },
-  { family: 'Institution', path: '/institution/admin', label: 'Institution', detail: 'Institution administration and student support.', icon: Building2 },
-  { family: 'Employer', path: '/employer/recruiter', label: 'Employer', detail: 'Hiring workflows where backend support exists.', icon: BriefcaseBusiness },
-  { family: 'Operations', path: '/operations/admin', label: 'Operations', detail: 'Platform administration and governance.', icon: ShieldCheck },
+  { family: 'Student', path: '/student', label: 'Student', detail: 'Learning, readiness, applications and personal growth.', icon: 'students' },
+  { family: 'Institution', path: '/institution/admin', label: 'Institution', detail: 'Institution administration and student support.', icon: 'company' },
+  { family: 'Employer', path: '/employer/recruiter', label: 'Employer', detail: 'Post jobs, review applicants and run your hiring.', icon: 'opportunities' },
+  { family: 'Operations', path: '/operations/admin', label: 'Operations', detail: 'Platform administration and governance.', icon: 'trust-safety' },
+  // GROWTH-01 (ADR-040): AI8HT's partnerships field staff. Navigation approved (HG-3, 2026-09-30).
+  { family: 'Growth', path: '/growth', label: 'Growth', detail: 'College and employer partnerships: leads, field visits, territory, targets and commission.', icon: 'territory' },
 ] as const;
 
 type WorkspaceFamily = typeof portalChoices[number]['family'];
@@ -132,11 +168,13 @@ interface PortalChoice {
   readonly path: string;
   readonly label: string;
   readonly detail: string;
-  readonly icon: LucideIcon;
+  readonly icon: IconName;
 }
 type AuthorizedWorkspace = PortalChoice & {
   readonly role: string;
   readonly organizationId: string | null;
+  /** The server's word on what this membership may do (ADR-032); undefined when not reported. */
+  readonly capabilities?: readonly string[];
 };
 type WorkspaceResolution =
   | { readonly state: 'loading' }
@@ -153,13 +191,27 @@ type CurrentStudentState =
   | { readonly state: 'resolved'; readonly student: CurrentStudentDto }
   | { readonly state: 'error'; readonly message: string };
 
+/**
+ * The application root: every route below, inside the 500 error boundary, with the offline banner
+ * (re-skin phase 8, systemPages.tsx).
+ */
 export function App(): React.ReactElement {
+  return <PageErrorBoundary>
+    <AppRoutes />
+    <OfflineBanner />
+  </PageErrorBoundary>;
+}
+
+function AppRoutes(): React.ReactElement {
   const [path, setPath] = useState(currentPath());
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(initialSidebarCollapsed);
   const [apiHealth, setApiHealth] = useState<ApiHealth>('checking');
   const [authStatus, setAuthStatus] = useState<AuthStatus>(() => (hasStoredAuthSession() && !currentPath().startsWith('/demo') ? { state: 'restoring' } : getAuthStatus()));
-  const [authNotice, setAuthNotice] = useState(getAuthDebugStatus());
+  const [authNotice, setAuthNotice] = useState('');
+  // A saved sign-in that ran out shows "Your session has expired" instead of a plain sign-in prompt.
+  const expiredAtLoad = useRef(hasExpiredStoredSession());
+  const [sessionExpired, setSessionExpired] = useState(false);
   const [workspaceResolution, setWorkspaceResolution] = useState<WorkspaceResolution>({ state: 'loading' });
   const [workspaceRetryNonce, setWorkspaceRetryNonce] = useState(0);
   const [currentStudent, setCurrentStudent] = useState<CurrentStudentState>({ state: 'idle' });
@@ -181,6 +233,7 @@ export function App(): React.ReactElement {
       const restored = completed ? getAuthStatus() : await restoreAuthenticatedSession();
       if (!mounted) return;
       setAuthStatus(restored);
+      if (!completed && restored.state === 'anonymous' && expiredAtLoad.current) setSessionExpired(true);
       if (completed) setAuthNotice('Signed in with the configured non-production identity provider.');
       else if (restored.state === 'authenticated') setAuthNotice('Restored your ONE session.');
     })()
@@ -189,10 +242,21 @@ export function App(): React.ReactElement {
         setAuthStatus(getAuthStatus());
         window.history.replaceState(null, '', '/login');
         setPath(currentPath());
-        setAuthNotice('Sign-in could not be completed. Try again or verify the non-production Cognito configuration.');
+        setAuthNotice('Sign-in could not be completed. Try again.');
       });
     return () => { mounted = false; };
   }, []);
+
+  // While signed in, notice when the access token runs out, so the next protected page says why.
+  useEffect(() => {
+    if (authStatus.state !== 'authenticated') return undefined;
+    const timer = window.setInterval(() => {
+      if (getAccessToken()) return;
+      setSessionExpired(true);
+      setAuthStatus(getAuthStatus());
+    }, 30_000);
+    return () => window.clearInterval(timer);
+  }, [authStatus.state]);
 
   useEffect(() => {
     if (authStatus.state !== 'authenticated') {
@@ -245,7 +309,7 @@ export function App(): React.ReactElement {
     }
     const token = getAccessToken();
     if (!token) {
-      setCurrentStudent({ state: 'error', message: 'No protected access token is available for Student identity.' });
+      setCurrentStudent({ state: 'error', message: 'Sign in again to open your account.' });
       return;
     }
     const controller = new AbortController();
@@ -282,7 +346,7 @@ export function App(): React.ReactElement {
   const activeWorkspace = workspaceResolution.state === 'resolved' ? workspaceForPath(path, workspaceResolution.choices) : null;
 
   useEffect(() => {
-    if (path === '/' || path === '/login' || path === '/demo' || effectivePath.startsWith('/institution/placement-officer') || rolePortal) return;
+    if (path === '/' || path === '/login' || path === '/demo' || path === '/employer-access' || effectivePath.startsWith('/institution/placement-officer') || rolePortal) return;
     const title = route === 'dashboard' ? 'Student Dashboard' : routeTitles[route].title;
     document.title = route === 'dashboard' ? `${title} | ${productName}` : `${title} - Student | ${productName}`;
   }, [effectivePath, path, rolePortal, route]);
@@ -293,7 +357,9 @@ export function App(): React.ReactElement {
 
   // Demo identities render the pilot experience and nothing else; every other
   // signed-in user falls through to the real application untouched.
-  if (authenticated && isPilotIdentity(authenticatedEmail)) {
+  // Only in a build with the demo flag on (local development, or the demo host): the
+  // production build of oneby8.com carries no pilot at all - demos live on demo.oneby8.com.
+  if (enableDemoPortal && authenticated && isPilotIdentity(authenticatedEmail)) {
     return <PilotApp email={authenticatedEmail ?? ''} onSignOut={handleSignOut} />;
   }
 
@@ -303,6 +369,36 @@ export function App(): React.ReactElement {
   if (import.meta.env.DEV && path.startsWith('/pilot-preview')) {
     const previewPersona = path.endsWith('/institution') ? 'demo.institution' : path.endsWith('/employer') ? 'demo.employer' : 'demo.student';
     return <PilotApp email={`${previewPersona}@dev.local`} onSignOut={handleSignOut} />;
+  }
+
+  // The one route that renders without a session. It must be checked before anything that
+  // looks at authStatus, or a signed-out visitor would be sent to the login screen instead
+  // of the page they were given a link to.
+  if (path.startsWith('/p/')) {
+    const shareToken = path.slice(3);
+    if (shareToken) return <PublicProfilePage token={shareToken} />;
+  }
+
+  // Password reset and the legal placeholders are signed-out pages too, for the same reason.
+  if (path === '/forgot-password' || path === '/privacy' || path === '/terms') {
+    const navigate = (nextPath: string) => { window.history.pushState(null, '', nextPath); setPath(currentPath()); };
+    if (path === '/forgot-password') return <ForgotPasswordPage onNavigate={navigate} />;
+    return <LegalPlaceholderPage kind={path === '/privacy' ? 'privacy' : 'terms'} onNavigate={navigate} />;
+  }
+
+  // EMP-04: the public employer access request. Like /p/, it renders without a session and
+  // creates nothing but a pending request for operations to review.
+  if (path === '/employer-access') {
+    return <PublicEmployerAccessPage onNavigate={(nextPath) => {
+      window.history.pushState(null, '', nextPath);
+      setPath(currentPath());
+    }} />;
+  }
+
+  // 404: a path no part of the app answers. (Unknown pages inside a portal show the 404 inside
+  // that portal's shell, so its navigation stays.)
+  if (!demoPath && !isKnownAppPath(path)) {
+    return <NotFoundPage home={{ label: authenticated ? 'Go to home' : 'Go to sign in', onClick: () => { window.history.pushState(null, '', authenticated ? '/' : '/login'); setPath(currentPath()); } }} />;
   }
 
   if (path === '/' || path === '/login') {
@@ -317,6 +413,10 @@ export function App(): React.ReactElement {
       window.history.pushState(null, '', nextPath);
       setPath(currentPath());
     }} />;
+  }
+
+  if (isProtectedPortalPath(path) && !demoPath && !authenticated && sessionExpired && authStatus.state === 'anonymous') {
+    return <SessionExpiredPage onSignIn={handleHostedSignIn} />;
   }
 
   if (isProtectedPortalPath(path) && !demoPath && !authenticated) {
@@ -370,7 +470,7 @@ export function App(): React.ReactElement {
   }
 
   if (rolePortal) {
-    return <RolePortal portal={rolePortal} apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} onSignIn={handleHostedSignIn} onSignOut={handleSignOut} showDevelopmentIndicators={showDevelopmentIndicators} onNavigate={() => setPath(currentPath())} demoMode={Boolean(demoPath)} authenticatedWorkspace={activeWorkspace ? { role: activeWorkspace.role, organizationId: activeWorkspace.organizationId } : undefined} />;
+    return <RolePortal portal={rolePortal} apiHealth={apiHealth} authStatus={authStatus} authNotice={authNotice} onSignIn={handleHostedSignIn} onSignOut={handleSignOut} showDevelopmentIndicators={showDevelopmentIndicators} onNavigate={() => setPath(currentPath())} demoMode={Boolean(demoPath)} authenticatedWorkspace={activeWorkspace ? { role: activeWorkspace.role, organizationId: activeWorkspace.organizationId, ...(activeWorkspace.capabilities ? { capabilities: activeWorkspace.capabilities } : {}), ...(workspaceResolution.state === 'resolved' ? { workspaceCount: workspaceResolution.choices.length } : {}) } : undefined} />;
   }
 
   if (!demoPath && authenticated) {
@@ -391,6 +491,7 @@ export function App(): React.ReactElement {
       onSignIn={handleHostedSignIn}
       onSignOut={handleSignOut}
       workspace={activeWorkspace ?? undefined}
+      workspaceCount={workspaceResolution.state === 'resolved' ? workspaceResolution.choices.length : 0}
     />;
   }
 
@@ -404,6 +505,7 @@ export function App(): React.ReactElement {
   async function handleSignIn(email: string, password: string): Promise<void> {
     const result = await signInWithPassword(email, password);
     if (result.state === 'success') {
+      setSessionExpired(false);
       setAuthStatus(getAuthStatus());
       setAuthNotice('Signed in to ONE.');
       window.history.replaceState(null, '', '/');
@@ -416,18 +518,18 @@ export function App(): React.ReactElement {
     setAuthNotice(loginNoticeFor(result.state));
   }
 
-  async function handleHostedSignIn(): Promise<void> {
-    try {
-      await beginHostedLogin(`${window.location.pathname}${window.location.search}`);
-    } catch {
-      setAuthNotice('Cognito UAT login is not configured. Supply the approved non-production Hosted UI settings.');
-    }
+  // Every "Sign in" control leads to the sign-in card. The Cognito Hosted UI is not offered:
+  // on oneby8.com it ended on Amazon's bare error page under a pool domain named "uat".
+  // completeHostedLoginFromLocation still finishes any hosted sign-in already under way.
+  function handleHostedSignIn(): void {
+    window.history.pushState(null, '', '/login');
+    setPath(currentPath());
   }
 
   function handleSignOut(): void {
     signOut();
     setAuthStatus(getAuthStatus());
-    setAuthNotice(getAuthDebugStatus());
+    setAuthNotice('You have signed out.');
   }
 
   function handleRetryWorkspace(): void {
@@ -439,50 +541,76 @@ export function App(): React.ReactElement {
 function LoginEntry({ authStatus, authNotice, workspaceResolution, onSignIn, onHostedSignIn, onSignOut, onRetryWorkspace, onNavigate }: { readonly authStatus: AuthStatus; readonly authNotice: string; readonly workspaceResolution: WorkspaceResolution; readonly onSignIn: (email: string, password: string) => void | Promise<void>; readonly onHostedSignIn: () => void; readonly onSignOut: () => void; readonly onRetryWorkspace: () => void; readonly onNavigate: (path: string) => void }): React.ReactElement {
   useEffect(() => { document.title = `Sign in | ${productName}`; }, []);
   if (authStatus.state === 'authenticated') return <WorkspaceChooser authStatus={authStatus} authNotice={authNotice} workspaceResolution={workspaceResolution} onSignIn={onHostedSignIn} onSignOut={onSignOut} onRetryWorkspace={onRetryWorkspace} onNavigate={onNavigate} />;
-  const signInUnavailable = authStatus.state === 'unconfigured';
-  function submitLogin(event: FormEvent<HTMLFormElement>): void {
+  return <SignInCard signInUnavailable={authStatus.state === 'unconfigured'} authNotice={authNotice} onSignIn={onSignIn} onNavigate={onNavigate} />;
+}
+
+function SignInCard({ signInUnavailable, authNotice, onSignIn, onNavigate }: { readonly signInUnavailable: boolean; readonly authNotice: string; readonly onSignIn: (email: string, password: string) => void | Promise<void>; readonly onNavigate: (path: string) => void }): React.ReactElement {
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
+  const [busy, setBusy] = useState(false);
+  async function submitLogin(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-    if (signInUnavailable) return;
+    if (signInUnavailable || busy) return;
     const form = new FormData(event.currentTarget);
-    const email = String(form.get('email') ?? '');
+    const email = String(form.get('email') ?? '').trim();
     const password = String(form.get('password') ?? '');
-    void onSignIn(email, password);
+    const errors: { email?: string; password?: string } = {};
+    if (!email) errors.email = 'Enter your email address.';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = 'Enter a valid email address.';
+    if (!password) errors.password = 'Enter your password.';
+    setFieldErrors(errors);
+    if (errors.email || errors.password) {
+      (event.currentTarget.elements.namedItem(errors.email ? 'email' : 'password') as HTMLInputElement | null)?.focus();
+      return;
+    }
+    setBusy(true);
+    try { await onSignIn(email, password); } finally { setBusy(false); }
   }
-  return <main className="login-shell">
-    <section className="login-card" aria-labelledby="one-login-title">
-      <BrandWordmark className="login-logo" height={44} />
-      <p className="auth-eyebrow">ONE PLATFORM</p>
-      <h1 id="one-login-title">Sign in</h1>
-      <p className="auth-subtitle">Sign in to your verified ONE career-readiness workspace.</p>
-      <form className="login-form" onSubmit={submitLogin} noValidate>
+  const go = (path: string) => (event: React.MouseEvent<HTMLAnchorElement>) => { event.preventDefault(); onNavigate(path); };
+  const noticeIsError = /failed|incorrect|required|expired|could not|not available/i.test(authNotice);
+  return <AuthLayout onNavigate={onNavigate}>
+    <section className="login-card sign-in-card" aria-labelledby="one-login-title">
+      <p className="auth-eyebrow"><Icon name="chevron-up" size={16} />Welcome back</p>
+      <h1 id="one-login-title">Sign in to ONE</h1>
+      <p className="auth-subtitle">Pick up your loop where you left it.</p>
+      <form className="login-form" onSubmit={(event) => void submitLogin(event)} noValidate>
         <label htmlFor="one-login-email">Email</label>
-        <input id="one-login-email" name="email" type="email" autoComplete="username" inputMode="email" disabled={signInUnavailable} aria-describedby={signInUnavailable ? 'one-auth-unavailable' : undefined} />
-        <label htmlFor="one-login-password">Password</label>
-        <input id="one-login-password" name="password" type="password" autoComplete="current-password" disabled={signInUnavailable} aria-describedby={signInUnavailable ? 'one-auth-unavailable' : undefined} />
-        <button type="submit" disabled={signInUnavailable}>Sign in</button>
+        <span className="si-input"><MailGlyph /><input id="one-login-email" name="email" type="email" autoComplete="username" inputMode="email" disabled={signInUnavailable} aria-invalid={fieldErrors.email ? true : undefined} aria-describedby={signInUnavailable ? 'one-auth-unavailable' : fieldErrors.email ? 'one-login-email-error' : undefined} /></span>
+        {fieldErrors.email ? <p id="one-login-email-error" className="field-error">{fieldErrors.email}</p> : null}
+        <span className="login-label-row">
+          <label htmlFor="one-login-password">Password</label>
+          <a href="/forgot-password" onClick={go('/forgot-password')}>Forgot password?</a>
+        </span>
+        <PasswordInput id="one-login-password" name="password" autoComplete="current-password" leadingIcon disabled={signInUnavailable} invalid={Boolean(fieldErrors.password)} describedBy={signInUnavailable ? 'one-auth-unavailable' : fieldErrors.password ? 'one-login-password-error' : undefined} />
+        {fieldErrors.password ? <p id="one-login-password-error" className="field-error">{fieldErrors.password}</p> : null}
+        <button type="submit" className="si-go" disabled={signInUnavailable || busy}>{busy ? 'Signing in…' : 'Sign in'}{busy ? null : <Icon name="arrow-right" size={16} className="si-go-arrow" />}</button>
       </form>
-      {signInUnavailable ? <p id="one-auth-unavailable" className="auth-boundary" role="status">Secure sign-in is not available in this UAT environment yet.</p> : null}
-      {!signInUnavailable && authNotice ? <p className="auth-boundary" role={/failed|incorrect|required|expired|not configured/i.test(authNotice) ? 'alert' : 'status'}>{authNotice}</p> : null}
-      <p className="auth-footnote">{productTagline}</p>
-      {!signInUnavailable ? <button type="button" className="secondary" onClick={onHostedSignIn}>Use hosted sign-in fallback</button> : null}
+      {signInUnavailable ? <p id="one-auth-unavailable" className="auth-boundary" role="status">Sign-in is not available right now. Please try again later.</p> : null}
+      {!signInUnavailable && authNotice ? <p className={noticeIsError ? 'auth-boundary auth-error' : 'auth-boundary'} role={noticeIsError ? 'alert' : 'status'}>{authNotice}</p> : null}
       {enableDemoPortal ? <button type="button" className="secondary" onClick={() => onNavigate('/demo')}>Open demo previews</button> : null}
+      <p className="auth-footnote">Hiring graduates? <a href="/employer-access" onClick={go('/employer-access')}>Request employer access<Icon name="arrow-right" size={16} /></a></p>
+      <p className="auth-privacy"><Icon name="lock" size={16} />Your readiness band is advisory and never shared with employers.</p>
     </section>
-  </main>;
+  </AuthLayout>;
+}
+
+/** The envelope glyph of the approved sign-in card; the Momentum icon set has no mail icon. */
+function MailGlyph(): React.ReactElement {
+  return <svg className="si-input-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 7.2Q3 5 5.2 5H18.8Q21 5 21 7.2V16.8Q21 19 18.8 19H5.2Q3 19 3 16.8Z" fill="none" stroke="currentColor" strokeWidth="1.8" /><path d="M4 7l8 6 8-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /></svg>;
 }
 
 function loginNoticeFor(state: string): string {
   if (state === 'invalid_credentials') return 'Sign-in failed. Check your email and password.';
-  if (state === 'password_reset_required') return 'Password reset is required before this account can sign in.';
-  if (state === 'new_password_required') return 'A new password is required before this UAT account can continue.';
-  if (state === 'mfa_required') return 'MFA is required for this account and is not completed in this UAT form yet.';
-  if (state === 'session_expired') return 'The Cognito session expired. Please sign in again.';
-  if (state === 'unconfigured') return 'Cognito UAT password sign-in is not configured.';
-  return 'Sign-in could not be completed. Try again or verify the non-production Cognito configuration.';
+  if (state === 'password_reset_required') return 'This account needs a new password. Use “Forgot password?” to set one.';
+  if (state === 'new_password_required') return 'This account needs a new password before it can continue. Use “Forgot password?” to set one.';
+  if (state === 'mfa_required') return 'This account requires multi-factor sign-in, which is not available here yet. Write to info@ai8ht.pro for help.';
+  if (state === 'session_expired') return 'Your session expired. Please sign in again.';
+  if (state === 'unconfigured') return 'Sign-in is not available right now. Please try again later.';
+  return 'Sign-in could not be completed. Please try again.';
 }
 
 function SessionRestorationPage(): React.ReactElement {
   useEffect(() => { document.title = `Restoring session | ${productName}`; }, []);
-  return <main className="login-shell"><section className="login-card"><span className="eyebrow">{productTagline}</span><h1>Restoring your ONE session...</h1><p>ONE is checking your session-scoped Cognito tokens before opening a workspace.</p></section></main>;
+  return <main className="login-shell"><section className="login-card"><span className="eyebrow">{productTagline}</span><h1>Restoring your ONE session…</h1><p>Checking your sign-in before opening your workspace.</p></section></main>;
 }
 
 function WorkspaceChooser({ authStatus, authNotice, workspaceResolution, onSignIn, onSignOut, onRetryWorkspace, onNavigate }: { readonly authStatus: AuthStatus; readonly authNotice: string; readonly workspaceResolution: WorkspaceResolution; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly onRetryWorkspace: () => void; readonly onNavigate: (path: string) => void }): React.ReactElement {
@@ -490,7 +618,7 @@ function WorkspaceChooser({ authStatus, authNotice, workspaceResolution, onSignI
   const choices = workspaceResolution.state === 'resolved' ? workspaceResolution.choices : [];
   return <main className="login-shell">
     <section className="login-card workspace-card">
-      <BrandWordmark className="login-logo" height={44} />
+      <BrandLogo className="login-logo" width={160} clearSpace="none" />
       <span className="eyebrow">{productTagline}</span>
       <h1>Choose your ONE workspace</h1>
       <p>Workspace access is populated only from server-authorized active memberships. This chooser does not grant roles or bypass server authorization.</p>
@@ -499,7 +627,7 @@ function WorkspaceChooser({ authStatus, authNotice, workspaceResolution, onSignI
       {workspaceResolution.state === 'error' ? <p className="auth-boundary" role="alert">{workspaceResolution.message}</p> : null}
       {workspaceResolution.state === 'error' && workspaceResolution.retryable ? <button type="button" onClick={onRetryWorkspace}>Retry workspace</button> : null}
       {workspaceResolution.state === 'resolved' && choices.length === 0 ? <p className="auth-boundary" role="status">No active ONE workspace is available for this identity.</p> : null}
-      {choices.length > 0 ? <div className="workspace-grid">{choices.map((choice) => { const Icon = choice.icon; return <button key={choice.path} type="button" onClick={() => onNavigate(choice.path)}><Icon size={20} /><strong>{choice.label}</strong><span>{choice.detail}</span></button>; })}</div> : null}
+      {choices.length > 0 ? <div className="workspace-grid">{choices.map((choice) => { const glyph = choice.icon; return <button key={choice.path} type="button" onClick={() => onNavigate(choice.path)}><Icon name={glyph} size={20} /><strong>{choice.label}</strong><span>{choice.detail}</span></button>; })}</div> : null}
     </section>
   </main>;
 }
@@ -507,10 +635,31 @@ function WorkspaceChooser({ authStatus, authNotice, workspaceResolution, onSignI
 function resolveAuthorizedWorkspaces(context: SecurityContextDto): readonly AuthorizedWorkspace[] {
   const workspaces: AuthorizedWorkspace[] = [];
   const pushUnique = (workspace: AuthorizedWorkspace): void => {
+    if (workspace.family === 'Growth') {
+      // One Growth entry: a person who is both a manager and an executive works as the manager.
+      const existing = workspaces.findIndex((item) => item.family === 'Growth');
+      if (existing >= 0) {
+        if (workspace.role === 'GROWTH_MANAGER') workspaces[existing] = workspace;
+        return;
+      }
+    }
+    if (workspace.family === 'Employer') {
+      // One employer entry per organisation, as on Android: a person who is both owner and
+      // recruiter of the same employer opens one portal, labelled with the broader role.
+      const existing = workspaces.findIndex((item) => item.family === 'Employer' && item.organizationId === workspace.organizationId);
+      if (existing >= 0) {
+        if (employerRoleRank(workspace.role) < employerRoleRank(workspaces[existing]!.role)) workspaces[existing] = workspace;
+        return;
+      }
+    }
     if (!workspaces.some((item) => item.path === workspace.path && item.role === workspace.role && item.organizationId === workspace.organizationId)) workspaces.push(workspace);
   };
   if ((context.studentRelationships?.length ?? 0) > 0) {
     pushUnique({ ...portalChoices[0], role: 'STUDENT', organizationId: context.studentRelationships?.[0]?.institutionId ?? null });
+  } else if ((context.formerStudentRelationships?.length ?? 0) > 0) {
+    // INST-10: someone who graduated, transferred or left keeps their student workspace for their
+    // own data. No college is attached to it: they have left, and nothing may scope by it.
+    pushUnique({ ...portalChoices[0], role: 'STUDENT', organizationId: null });
   }
   for (const membership of context.memberships) {
     const workspace = workspaceForMembership(membership);
@@ -538,20 +687,39 @@ function workspaceError(reason: WorkspaceResolutionFailureReason, correlationId?
     reason,
     retryable,
     ...(correlationId ? { correlationId } : {}),
-    message: `We could not load your ONE workspace.${correlationId ? ` Reference: ${correlationId}` : ''}`,
+    message: `We could not load your ONE workspace.${correlationId ? supportCodeSuffix(correlationId) : ''}`,
   };
 }
 
+const employerRoleOrder = ['EMPLOYER_OWNER', 'EMPLOYER_ADMIN', 'RECRUITER'] as const;
+function employerRoleRank(role: string): number {
+  const rank = employerRoleOrder.indexOf(role as typeof employerRoleOrder[number]);
+  return rank < 0 ? employerRoleOrder.length : rank;
+}
+
 function workspaceForMembership(membership: SecurityContextDto['memberships'][number]): AuthorizedWorkspace | null {
+  const workspace = workspaceForMembershipRole(membership);
+  return workspace && membership.capabilities ? { ...workspace, capabilities: membership.capabilities } : workspace;
+}
+
+function workspaceForMembershipRole(membership: SecurityContextDto['memberships'][number]): AuthorizedWorkspace | null {
   const organizationId = membership.organizationId;
   if (membership.role === 'INSTITUTION_OWNER' || membership.role === 'INSTITUTION_ADMIN') return { ...portalChoices[1], role: membership.role, organizationId };
   if (membership.role === 'PLACEMENT_ADMIN') return { ...portalChoices[1], path: '/institution/placement-officer', label: 'Placement Admin', detail: 'Placement operations for the authorized institution.', role: membership.role, organizationId };
   if (membership.role === 'FACULTY_LECTURER') return { ...portalChoices[1], path: '/institution/faculty', label: 'Faculty', detail: 'Faculty workspace for assigned academic support.', role: membership.role, organizationId };
   if (membership.role === 'DEPARTMENT_HEAD') return { ...portalChoices[1], path: '/institution/department-head', label: 'Department Head', detail: 'Department workspace for authorized academic oversight.', role: membership.role, organizationId };
+  // Owners and admins run the same employer portal as recruiters; the server decides what each
+  // role may do, and owner/admin-only screens check the role for display only (EMP-01).
+  if (membership.role === 'EMPLOYER_OWNER') return { ...portalChoices[2], label: 'Employer Owner', detail: 'Employer workspace: hiring, team and company settings.', role: membership.role, organizationId };
+  if (membership.role === 'EMPLOYER_ADMIN') return { ...portalChoices[2], label: 'Employer Admin', detail: 'Employer workspace: hiring, recruiters and reports.', role: membership.role, organizationId };
   if (membership.role === 'RECRUITER') return { ...portalChoices[2], role: membership.role, organizationId };
   if (membership.role === 'OPERATIONS_ADMIN') return { ...portalChoices[3], role: membership.role, organizationId };
   if (membership.role === 'PLATFORM_SUPER_ADMIN') return { ...portalChoices[3], label: 'Platform Super Admin', detail: 'Platform operations workspace; distinct super-admin UI is not yet implemented.', role: membership.role, organizationId };
   if (membership.role === 'SECURITY_ADMIN') return { ...portalChoices[3], label: 'Security Admin', detail: 'Operations workspace available; dedicated security-admin surface is not yet implemented.', role: membership.role, organizationId };
+  // GROWTH-01: growth roles open the Growth portal only. They hold no internal capability, so
+  // no Operations workspace is offered to them.
+  if (membership.role === 'GROWTH_EXECUTIVE') return { ...portalChoices[4], label: 'Growth Executive', role: membership.role, organizationId };
+  if (membership.role === 'GROWTH_MANAGER') return { ...portalChoices[4], label: 'Growth Manager', role: membership.role, organizationId };
   return null;
 }
 
@@ -572,9 +740,9 @@ function AuthRequiredPage({ requestedPath, authStatus, authNotice, onSignIn, onS
     <section className="login-card">
       <span className="eyebrow">{productTagline}</span>
       <h1>Sign in required</h1>
-      <p>The {family} portal is protected. ONE does not use role selection, fixture data, or browser-stored demo identities to authenticate a user.</p>
+      <p>The {family} portal is only for people with an account. Sign in to continue.</p>
       <AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />
-      {authStatus.state === 'unconfigured' ? <p className="auth-boundary">Cognito is not configured, so this route fails closed.</p> : null}
+      {authStatus.state === 'unconfigured' ? <p className="auth-boundary">Sign-in is not available right now, so this page stays closed.</p> : null}
     </section>
   </main>;
 }
@@ -593,15 +761,12 @@ function WorkspaceResolutionPage({ authStatus, authNotice, onSignIn, onSignOut }
 
 function AccessDeniedPage({ requestedPath, authStatus, authNotice, message, retryable = false, onRetryWorkspace, onSignIn, onSignOut }: { readonly requestedPath: string; readonly authStatus: AuthStatus; readonly authNotice: string; readonly message?: string; readonly retryable?: boolean; readonly onRetryWorkspace?: () => void; readonly onSignIn: () => void; readonly onSignOut: () => void }): React.ReactElement {
   useEffect(() => { document.title = `Workspace unavailable | ${productName}`; }, []);
-  return <main className="login-shell">
-    <section className="login-card">
-      <span className="eyebrow">{productTagline}</span>
-      <h1>You do not have access to this workspace</h1>
-      <p>{message ?? `Your verified identity is not authorized for ${requestedPath}. ONE did not mount the requested portal UI.`}</p>
-      {retryable && onRetryWorkspace ? <button type="button" onClick={onRetryWorkspace}>Retry workspace</button> : null}
-      <AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />
-    </section>
-  </main>;
+  // The no-access system page (re-skin phase 8), with the account controls beneath it.
+  return <NoAccessPage title="You do not have access to this workspace"
+    body={message ?? `Your verified identity is not authorized for ${requestedPath}. ONE did not mount the requested portal UI.`}
+    {...(retryable && onRetryWorkspace ? { primary: { label: 'Retry workspace', onClick: onRetryWorkspace, icon: 'refresh' as const } } : {})}>
+    <div className="sys-controls"><AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} /></div>
+  </NoAccessPage>;
 }
 
 function DemoDisabledPage({ onNavigate }: { readonly onNavigate: (path: string) => void }): React.ReactElement {
@@ -646,9 +811,9 @@ function InvitationAcceptancePage({ authStatus, authNotice, onSignIn, onSignOut 
 
   return <main className="invitation-acceptance">
     <section className="role-page-heading"><div><span className="eyebrow">Verified invitation</span><h1>Accept organization invitation</h1>
-      <p>This page uses the existing protected invitation-acceptance API. The raw invitation token is read only from this link and is not stored in browser storage.</p></div>
+      <p>Accept the invitation you were sent. Your invitation link is used only on this page and is not saved in your browser.</p></div>
       <AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} /></section>
-    {!invitationToken ? <section className="role-empty"><h2>Invitation token missing</h2><p>Open the exact link delivered to the intended UAT email recipient.</p></section> : null}
+    {!invitationToken ? <section className="role-empty"><h2>Invitation link incomplete</h2><p>Open the full link from your invitation email.</p></section> : null}
     {authStatus.state !== 'authenticated' && invitationToken ? <section className="role-empty"><h2>Sign in required</h2><p>Sign in with the verified email address that received this invitation. If sign-in redirects away, reopen the Mailpit invitation link after the session is established.</p></section> : null}
     <section className="role-card role-wide" role="status"><h2>{accepted ? 'Accepted' : 'Status'}</h2><p>{status}</p></section>
   </main>;
@@ -658,12 +823,12 @@ function DemoStudentShell(props: Parameters<typeof StudentShell>[0]): React.Reac
   const { dispatch } = useStudentPreview();
   return <StudentShell
     {...props}
-    onMessages={() => dispatch({ type: 'status', status: 'Student messages require the secure backend messaging workflow; no message inbox was opened in preview.' })}
+    onMessages={() => dispatch({ type: 'status', status: 'Messages are not available in this preview.' })}
     onNotifications={() => dispatch({ type: 'status', status: 'Student notifications preview: 3 reminders are represented by local demo data only.' })}
   />;
 }
 
-function StudentShell({ apiHealth, authNotice, authStatus, currentStudent, demoMode, drawerOpen, menuButtonRef, path, route, setDrawerOpen, setPath, setSidebarCollapsed, sidebarCollapsed, onSignIn, onSignOut, workspace, onMessages, onNotifications }: { readonly apiHealth: ApiHealth; readonly authNotice: string; readonly authStatus: AuthStatus; readonly currentStudent: CurrentStudentState; readonly demoMode: boolean; readonly drawerOpen: boolean; readonly menuButtonRef: React.RefObject<HTMLButtonElement | null>; readonly path: string; readonly route: RouteKey; readonly setDrawerOpen: React.Dispatch<React.SetStateAction<boolean>>; readonly setPath: React.Dispatch<React.SetStateAction<string>>; readonly setSidebarCollapsed: React.Dispatch<React.SetStateAction<boolean>>; readonly sidebarCollapsed: boolean; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly workspace?: AuthorizedWorkspace | undefined; readonly onMessages?: () => void; readonly onNotifications?: () => void }): React.ReactElement {
+function StudentShell({ apiHealth, authNotice, authStatus, currentStudent, demoMode, drawerOpen, menuButtonRef, path, route, setDrawerOpen, setPath, setSidebarCollapsed, sidebarCollapsed, onSignIn, onSignOut, workspace, workspaceCount = 0, onMessages, onNotifications }: { readonly apiHealth: ApiHealth; readonly authNotice: string; readonly authStatus: AuthStatus; readonly currentStudent: CurrentStudentState; readonly demoMode: boolean; readonly drawerOpen: boolean; readonly menuButtonRef: React.RefObject<HTMLButtonElement | null>; readonly path: string; readonly route: RouteKey; readonly setDrawerOpen: React.Dispatch<React.SetStateAction<boolean>>; readonly setPath: React.Dispatch<React.SetStateAction<string>>; readonly setSidebarCollapsed: React.Dispatch<React.SetStateAction<boolean>>; readonly sidebarCollapsed: boolean; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly workspace?: AuthorizedWorkspace | undefined; readonly workspaceCount?: number; readonly onMessages?: () => void; readonly onNotifications?: () => void }): React.ReactElement {
   function navigate(item: NavItem): void {
     const nextPath = demoMode ? demoRouteFor(item.path) : item.path;
     window.history.pushState(null, '', nextPath);
@@ -675,12 +840,13 @@ function StudentShell({ apiHealth, authNotice, authStatus, currentStudent, demoM
     setDrawerOpen(false);
     menuButtonRef.current?.focus();
   }
+  const phone = usePhoneLayout();
 
   return (
     <ConsentGate>
-    <div className={`student-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+    <div className={`student-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''}${phone ? ' has-tabbar' : ''}`}>
       <a className="skip-link" href="#main-content">Skip to content</a>
-      <Sidebar path={path} collapsed={sidebarCollapsed} drawerOpen={drawerOpen} onNavigate={navigate} onCollapse={() => setSidebarCollapsed((value) => !value)} onClose={closeDrawer} />
+      <Sidebar path={path} collapsed={sidebarCollapsed} drawerOpen={drawerOpen} onNavigate={navigate} onCollapse={() => { rememberSidebarCollapsed(!sidebarCollapsed); setSidebarCollapsed(!sidebarCollapsed); }} onClose={closeDrawer} />
       {drawerOpen ? <button className="drawer-scrim" type="button" aria-label="Close navigation" onClick={closeDrawer} /> : null}
       <div className="student-workspace">
         <TopBar
@@ -698,15 +864,21 @@ function StudentShell({ apiHealth, authNotice, authStatus, currentStudent, demoM
           onSignOut={onSignOut}
           workspace={workspace}
           currentStudent={currentStudent}
+          onSwitchWorkspace={!demoMode && workspaceCount > 1 ? () => { window.history.pushState(null, '', '/'); setPath('/'); } : undefined}
         />
         <main id="main-content" className="student-main">
           {demoMode && showDevelopmentIndicators ? <PreviewBadge apiHealth={apiHealth} /> : null}
           {demoMode ? <StudentPreviewStatus authenticated={false} /> : <AuthenticatedStudentStatus currentStudent={currentStudent} />}
           {/* Pilot-exact pages carry their own pilot page head. */}
-          {['dashboard', 'practice', 'company-prep', 'career-tools', 'scholarships', 'resume-builder', 'career-path', 'learning', 'assessments', 'opportunities', 'profile'].includes(route) && authStatus.state === 'authenticated' ? null : <PageHeader meta={routeTitles[route]} />}
-          <RouteScreen route={route} authenticated={authStatus.state === 'authenticated'} currentStudent={currentStudent} />
+          {['dashboard', 'practice', 'company-prep', 'career-tools', 'scholarships', 'resume-builder', 'career-path', 'learning', 'assessments', 'opportunities', 'profile', 'explain'].includes(route) && authStatus.state === 'authenticated' ? null : <PageHeader meta={routeTitles[route]} />}
+          <PageErrorBoundary resetKey={path} inline>
+            {isKnownStudentPath(path)
+              ? <RouteScreen route={route} authenticated={authStatus.state === 'authenticated'} currentStudent={currentStudent} />
+              : <NotFoundPage inline home={{ to: demoMode ? '/demo/student' : '/student' }} help={{ to: demoMode ? '/demo/student/help' : '/student/help' }} />}
+          </PageErrorBoundary>
         </main>
       </div>
+      {phone ? <StudentTabBar path={path} onNavigate={navigate} onMore={() => setDrawerOpen(true)} moreOpen={drawerOpen} /> : null}
       <AssistantWidget persona="student" />
     </div>
     </ConsentGate>
@@ -716,7 +888,7 @@ function StudentShell({ apiHealth, authNotice, authStatus, currentStudent, demoM
 function StudentPreviewStatus({ authenticated }: { readonly authenticated: boolean }): React.ReactElement {
   const { state, dispatch } = useStudentPreview();
   if (authenticated) {
-    return <section className="student-preview-status" role="status" aria-live="polite"><div><strong>Authenticated API-backed mode</strong><span>Career Readiness data is loaded from the protected backend. Remaining preview-only modules stay labelled separately.</span></div></section>;
+    return <section className="student-preview-status" role="status" aria-live="polite"><div><strong>Signed in</strong><span>Your Career Readiness information is up to date. Sections that are not available yet say so.</span></div></section>;
   }
   return (
     <section className="student-preview-status" role="status" aria-live="polite">
@@ -726,43 +898,116 @@ function StudentPreviewStatus({ authenticated }: { readonly authenticated: boole
   );
 }
 
+/** Settings and Help & FAQ sit in the sidebar footer (approved 2026-10-11), with their labels and routes. */
+const footerRoutes: ReadonlySet<RouteKey> = new Set<RouteKey>(['settings', 'help']);
+
+function RailItem({ item, active, onNavigate }: { readonly item: NavItem; readonly active: boolean; readonly onNavigate: (item: NavItem) => void }): React.ReactElement {
+  // A short rail label is drawn beside the full one; CSS shows the short one on the desktop rail
+  // and the full one in the drawer. The accessible name is always the full label.
+  return <button type="button" className={`side-nav-item one-icon-host ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} aria-label={item.label} title={item.label} onClick={() => onNavigate(item)}>
+    <span className="rail-tile"><Icon name={item.icon} size={20} active={active} animated /></span>
+    {item.short ? <span className="rail-label has-short"><span className="rail-short" aria-hidden="true">{item.short}</span><span className="rail-full">{item.label}</span></span> : <span className="rail-label">{item.label}</span>}
+  </button>;
+}
+
 function Sidebar({ path, collapsed, drawerOpen, onNavigate, onCollapse, onClose }: { readonly path: string; readonly collapsed: boolean; readonly drawerOpen: boolean; readonly onNavigate: (item: NavItem) => void; readonly onCollapse: () => void; readonly onClose: () => void }): React.ReactElement {
   const groups = ['Plan', 'Prepare', 'Apply', 'Account'] as const;
+  const current = normalizePath(path);
+  // The Momentum icon rail: each item is an icon tile over its label. Collapsed, the labels go
+  // and the item keeps its name through aria-label and the hover title.
   return (
-    <aside className={`student-sidebar ${drawerOpen ? 'drawer-open' : ''}`} aria-label="Student navigation">
-      <div className="sidebar-brand"><BrandWordmark height={30} /><span className="brand-copy"><strong>ONE</strong><small>LEARN | PREPARE | BUILD | GROW</small></span><button className="icon-button sidebar-close" type="button" aria-label="Close navigation" onClick={onClose} autoFocus={drawerOpen}><X size={18} /></button></div>
+    <aside className={`student-sidebar momentum-rail ${drawerOpen ? 'drawer-open' : ''}`} aria-label="Student navigation">
+      <div className="sidebar-brand"><BrandLogo width={collapsed ? 40 : 64} compact={collapsed} /><span className="brand-copy"><small>LEARN | PREPARE | BUILD | GROW</small></span><button className="icon-button sidebar-close" type="button" aria-label="Close navigation" onClick={onClose} autoFocus={drawerOpen}><Icon name="close" size={20} /></button></div>
       <nav className="sidebar-nav" aria-label="Grouped Student navigation">
-        {groups.map((group) => <div className="nav-group" key={group}><span className="nav-group-label">{group}</span>{navItems.filter((item) => item.group === group).map((item) => { const Icon = item.icon; const active = normalizePath(path) === item.path; return <button key={item.path} type="button" className={`side-nav-item ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} onClick={() => onNavigate(item)}><Icon size={18} aria-hidden="true" /><span>{item.label}</span></button>; })}</div>)}
+        <NavIndicator activeKey={current} layoutKey={`${collapsed}-${drawerOpen}`} />
+        {groups.map((group) => <div className="nav-group" key={group}><span className="nav-group-label">{group}</span>{navItems.filter((item) => item.group === group && !footerRoutes.has(item.route)).map((item) => <RailItem key={item.path} item={item} active={current === item.path} onNavigate={onNavigate} />)}</div>)}
       </nav>
-      <div className="sidebar-footer"><button className="collapse-button" type="button" onClick={onCollapse} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>{collapsed ? 'Expand' : 'Collapse'}</button></div>
+      <div className="sidebar-footer">
+        <div className="sidebar-footer-links" role="group" aria-label="Settings and help">{navItems.filter((item) => footerRoutes.has(item.route)).map((item) => <RailItem key={item.path} item={item} active={current === item.path} onNavigate={onNavigate} />)}</div>
+        <button className="collapse-button" type="button" onClick={onCollapse} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}><span className="rail-tile">{collapsed ? <Icon name="collapse-rail" size={20} className="one-icon--flip" /> : <Icon name="collapse-rail" size={20} />}</span><span className="rail-label">{collapsed ? 'Expand' : 'Collapse'}</span></button>
+      </div>
     </aside>
   );
 }
 
-function TopBar({ apiHealth, authNotice, authStatus, showDevelopmentIndicators, menuButtonRef, onOpenMenu, onMessages, onNotifications, onProfile, profileActive, onSignIn, onSignOut, workspace, currentStudent }: { readonly apiHealth: ApiHealth; readonly authNotice: string; readonly authStatus: AuthStatus; readonly showDevelopmentIndicators: boolean; readonly menuButtonRef: React.RefObject<HTMLButtonElement | null>; readonly onOpenMenu: () => void; readonly onMessages: () => void; readonly onNotifications: () => void; readonly onProfile: () => void; readonly profileActive: boolean; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly workspace?: AuthorizedWorkspace | undefined; readonly currentStudent: CurrentStudentState }): React.ReactElement {
+/** The phone tab bar (unified/mobile.html), beside the drawer: four destinations and "More", which opens the full drawer. */
+const tabBarItems: readonly { readonly label: string; readonly route: RouteKey }[] = [
+  { label: 'Home', route: 'dashboard' }, { label: 'Readiness', route: 'readiness' }, { label: 'Learning', route: 'learning' },
+  // Explore is the approved tab name for Opportunities.
+  { label: 'Explore', route: 'opportunities' },
+];
+
+/** Phones only: true while the viewport is 760px or narrower. Without matchMedia (tests, old browsers) it stays false. */
+const PHONE_QUERY = '(max-width: 760px)';
+function usePhoneLayout(): boolean {
+  const [phone, setPhone] = useState(() => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(PHONE_QUERY).matches);
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return undefined;
+    const query = window.matchMedia(PHONE_QUERY);
+    const update = (): void => setPhone(query.matches);
+    update();
+    query.addEventListener?.('change', update);
+    return () => query.removeEventListener?.('change', update);
+  }, []);
+  return phone;
+}
+
+function StudentTabBar({ path, onNavigate, onMore, moreOpen }: { readonly path: string; readonly onNavigate: (item: NavItem) => void; readonly onMore: () => void; readonly moreOpen: boolean }): React.ReactElement {
+  const current = normalizePath(path);
+  return <nav className="student-tabbar" aria-label="Student quick navigation">
+    {tabBarItems.map((tab) => {
+      const item = navItems.find((entry) => entry.route === tab.route)!;
+      const active = current === item.path;
+      return <button key={tab.route} type="button" className={`tabbar-item one-icon-host ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} aria-label={item.label} title={item.label} onClick={() => onNavigate(item)}>
+        <Icon name={item.icon} size={24} active={active} animated /><span>{tab.label}</span>
+      </button>;
+    })}
+    <button type="button" className="tabbar-item" aria-label="More navigation" aria-expanded={moreOpen} onClick={onMore}><Icon name="more-horizontal" size={24} /><span>More</span></button>
+  </nav>;
+}
+
+function TopBar({ apiHealth, authNotice, authStatus, showDevelopmentIndicators, menuButtonRef, onOpenMenu, onMessages, onNotifications, onProfile, profileActive, onSignIn, onSignOut, workspace, currentStudent, onSwitchWorkspace }: { readonly apiHealth: ApiHealth; readonly authNotice: string; readonly authStatus: AuthStatus; readonly showDevelopmentIndicators: boolean; readonly menuButtonRef: React.RefObject<HTMLButtonElement | null>; readonly onOpenMenu: () => void; readonly onMessages: () => void; readonly onNotifications: () => void; readonly onProfile: () => void; readonly profileActive: boolean; readonly onSignIn: () => void; readonly onSignOut: () => void; readonly workspace?: AuthorizedWorkspace | undefined; readonly currentStudent: CurrentStudentState; readonly onSwitchWorkspace?: (() => void) | undefined }): React.ReactElement {
   const identity = studentIdentityFromAuth(authStatus, currentStudent);
   return (
     <header className="student-topbar">
-      <button ref={menuButtonRef} className="icon-button mobile-menu-button" type="button" onClick={onOpenMenu} aria-label="Open student navigation"><Menu size={20} /></button>
-      <label className="global-search" role="search"><Search size={17} aria-hidden="true" /><span className="sr-only">Search student workspace</span><input placeholder="Search opportunities, skills, assessments..." /></label>
-      <div className="topbar-actions"><StudentMessagesFlyout /><StudentNotificationsBell /><AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />{showDevelopmentIndicators ? <span className={`api-dot ${apiHealth}`}>{apiHealth === 'online' ? 'API Online' : apiHealth === 'offline' ? 'API Offline' : 'Checking'}</span> : null}<button className="profile-menu" type="button" aria-label="Student profile menu" onClick={onProfile} disabled={profileActive}><span className="avatar">{identity.initials}</span><span><strong>{identity.name}</strong><small>{workspace ? `Role: ${workspace.role}` : identity.detail}</small></span><ChevronDown size={15} aria-hidden="true" /></button></div>
+      <button ref={menuButtonRef} className="icon-button mobile-menu-button" type="button" onClick={onOpenMenu} aria-label="Open student navigation"><Icon name="menu" size={20} /></button>
+      <span className="topbar-brand"><BrandLogo width={64} /></span>
+      <label className="global-search" role="search"><Icon name="search" size={16} /><span className="sr-only">Search student workspace</span><input placeholder="Search opportunities, skills, assessments..." /></label>
+      <div className="topbar-actions">{onSwitchWorkspace ? <button type="button" className="secondary role-switch" onClick={onSwitchWorkspace}><Icon name="switch-workspace" size={16} /><span className="role-switch-label">Switch workspace</span></button> : null}<ThemeToggle /><StudentMessagesFlyout /><StudentNotificationsBell /><AuthControls authStatus={authStatus} notice={authNotice} onSignIn={onSignIn} onSignOut={onSignOut} />{showDevelopmentIndicators ? <span className={`api-dot ${apiHealth}`}>{apiHealth === 'online' ? 'API Online' : apiHealth === 'offline' ? 'API Offline' : 'Checking'}</span> : null}<button className="profile-menu" type="button" aria-label="Student profile menu" onClick={onProfile} disabled={profileActive}><span className="avatar">{identity.initials}</span><span><strong>{identity.name}</strong><small>{workspace ? `Role: ${roleLabel(workspace.role)}` : identity.detail}</small></span><Icon name="chevron-down" size={16} /></button></div>
     </header>
   );
 }
 
 function AuthenticatedStudentStatus({ currentStudent }: { readonly currentStudent: CurrentStudentState }): React.ReactElement {
   if (currentStudent.state === 'loading' || currentStudent.state === 'idle') {
-    return <section className="student-preview-status" role="status" aria-live="polite"><div><strong>Loading real Student identity</strong><span>ONE is loading your protected Student profile from the API.</span></div></section>;
+    return <section className="student-preview-status" role="status" aria-live="polite"><div><strong>Loading your profile</strong><span>One moment while ONE opens your account.</span></div></section>;
   }
   if (currentStudent.state === 'error') {
     return <section className="student-preview-status" role="alert"><div><strong>Student identity unavailable</strong><span>{currentStudent.message}</span></div></section>;
   }
   if (currentStudent.state !== 'resolved') {
-    return <section className="student-preview-status" role="status" aria-live="polite"><div><strong>Loading real Student identity</strong><span>ONE is loading your protected Student profile from the API.</span></div></section>;
+    return <section className="student-preview-status" role="status" aria-live="polite"><div><strong>Loading your profile</strong><span>One moment while ONE opens your account.</span></div></section>;
   }
+  // INST-10: a former student is told plainly where they stand and what they keep.
+  if (currentStudent.student.formerStudent) return <FormerStudentNotice student={currentStudent.student} />;
   // Resolved: render nothing. The top bar already shows the user's name and
   // role; repeating email and account state here read as debug output (UAT #18).
   return <></>;
+}
+
+const formerStudentWords: Readonly<Record<string, string>> = { GRADUATED: 'Graduated from', TRANSFERRED: 'Transferred from', ENDED: 'Left' };
+
+/** What an alumnus sees above their workspace: where they stand, and what they keep (INST-10). */
+export function FormerStudentNotice({ student }: { readonly student: CurrentStudentDto }): React.ReactElement {
+  const college = student.institutionName ?? 'your college';
+  const state = student.relationship?.state ?? student.academicStatus;
+  const when = student.relationship?.effectiveTo
+    ? formatDate(student.relationship.effectiveTo)
+    : null;
+  return <section className="student-preview-status" role="status" aria-live="polite"><div>
+    <strong>{formerStudentWords[state] ?? 'Left'} {college}{when ? ` on ${when}` : ''}</strong>
+    <span>Your ONE account, your records and your choices stay yours. {college} now sees only what happened before that date. You can still ask it to verify past results from Academic record.</span>
+  </div></section>;
 }
 
 function studentIdentityFromAuth(authStatus: AuthStatus, currentStudent: CurrentStudentState): { readonly name: string; readonly initials: string; readonly detail: string } {
@@ -809,20 +1054,23 @@ function RouteScreen({ route, authenticated, currentStudent }: { readonly route:
   if (route === 'career-tools') return <StudentCareerToolsPage />;
   if (route === 'scholarships') return <StudentScholarshipsPage />;
   if (route === 'resume-builder') return <StudentResumeBuilderPage />;
+  if (route === 'calendar') return <CalendarPage />;
+  // No sample lesson is shown in the preview: the screen needs a signed-in student and the real feature.
+  if (route === 'explain') return <V2EmptyState icon="💡" title="Ask ONE to explain needs you signed in" note="Sign in to ask ONE to explain a topic. Nothing is shown here in the preview." />;
   return <SettingsPage />;
 }
 
 function AuthenticatedStudentRoute({ route, currentStudent }: { readonly route: RouteKey; readonly currentStudent: CurrentStudentState }): React.ReactElement {
   if (route === 'dashboard') return <AuthenticatedStudentDashboard currentStudent={currentStudent} />;
-  if (route === 'profile') return <StudentProfileV3><AuthenticatedStudentProfile /></StudentProfileV3>;
+  if (route === 'profile') return <StudentProfileV3><AuthenticatedStudentProfile /><ShareProfilePanel /><StudentTalentPoolCard /><StudentOutcomesCard /></StudentProfileV3>;
   if (route === 'documents') return <AuthenticatedStudentDocuments />;
   if (route === 'opportunities') return <StudentOpportunitiesV3><StudentOpportunitiesPage /><AuthenticatedStudentSavedOpportunities /></StudentOpportunitiesV3>;
   if (route === 'applications') return <StudentApplicationsPage />;
-  if (route === 'career-path') return <StudentRoadmapV3><CareerReadinessApiPanel route="roadmap" /></StudentRoadmapV3>;
+  if (route === 'career-path') return <StudentRoadmapV3><StudentGoalsPanel /><CareerReadinessApiPanel route="roadmap" /></StudentRoadmapV3>;
   if (route === 'readiness') return <CareerReadinessApiPanel route="readiness" />;
   if (route === 'skills') return <CareerReadinessApiPanel route="skills" />;
-  if (route === 'assessments') return <StudentAssessmentsV3><ExamAttemptPanel /><CareerReadinessApiPanel route="assessments" /></StudentAssessmentsV3>;
-  if (route === 'learning') return <StudentLearningV3><CareerReadinessApiPanel route="learning" /></StudentLearningV3>;
+  if (route === 'assessments') return <StudentAssessmentsV3><ExamAttemptPanel /><ScreeningAssessmentsPage /><CareerReadinessApiPanel route="assessments" /></StudentAssessmentsV3>;
+  if (route === 'learning') return <StudentLearningV3><StudentLearningPlan /><CareerReadinessApiPanel route="learning" /></StudentLearningV3>;
   if (route === 'settings') return <><CareerReadinessApiPanel route="notifications" /><StudentPrivacyPanel /></>;
   if (route === 'help') return <HelpFaqPanel persona="student" />;
   if (route === 'practice') return <StudentPracticePage />;
@@ -830,6 +1078,11 @@ function AuthenticatedStudentRoute({ route, currentStudent }: { readonly route: 
   if (route === 'career-tools') return <StudentCareerToolsPage />;
   if (route === 'scholarships') return <StudentScholarshipsPage />;
   if (route === 'resume-builder') return <StudentResumeBuilderPage />;
+  // Interviews and Calendar open the real, already-built views: the interview list Applications
+  // shows (EMP-08) and the one calendar every role reads (/api/v1/me/calendar).
+  if (route === 'interviews') return <StudentInterviewsPanel />;
+  if (route === 'calendar') return <CalendarPage />;
+  if (route === 'explain') return <StudentExplainV3><StudentExplainPage /></StudentExplainV3>;
   return <AuthenticatedStudentUnavailable route={route} />;
 }
 
@@ -846,7 +1099,7 @@ function AuthenticatedStudentProfile(): React.ReactElement {
   useEffect(() => {
     const token = getAccessToken();
     if (!token) {
-      setStatus('No protected access token is available.');
+      setStatus('Sign in again to continue.');
       return undefined;
     }
     const controller = new AbortController();
@@ -859,7 +1112,7 @@ function AuthenticatedStudentProfile(): React.ReactElement {
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     const token = getAccessToken();
-    if (!token) return setStatus('No protected access token is available.');
+    if (!token) return setStatus('Sign in again to continue.');
     const form = new FormData(event.currentTarget);
     const body = {
       targetCareer: String(form.get('targetCareer') ?? '').trim(),
@@ -867,7 +1120,9 @@ function AuthenticatedStudentProfile(): React.ReactElement {
       profileSummary: String(form.get('profileSummary') ?? '').trim(),
       portfolioUrl: String(form.get('portfolioUrl') ?? '').trim(),
       visibilityState: String(form.get('visibilityState') ?? 'PRIVATE'),
-      employerDiscoveryEnabled: form.get('employerDiscoveryEnabled') === 'on',
+      // EMP-14: being found by employers is joined and left only through the Talent pool card below,
+      // which also records the consent; this form keeps whatever that set.
+      employerDiscoveryEnabled: profile?.employerDiscoveryEnabled ?? false,
       careerInterests: String(form.get('careerInterests') ?? '').split(',').map((item) => item.trim()).filter(Boolean),
     };
     try {
@@ -883,11 +1138,10 @@ function AuthenticatedStudentProfile(): React.ReactElement {
     <form className="card wide-card student-form" onSubmit={(event) => { void submit(event); }}>
       <label className="student-form-field"><span>Target career</span><input name="targetCareer" defaultValue={profile?.targetCareer ?? ''} maxLength={120} /></label>
       <label className="student-form-field"><span>Headline</span><input name="profileHeadline" defaultValue={profile?.profileHeadline ?? ''} maxLength={160} /></label>
-      <label className="student-form-field"><span>Career interests, comma separated</span><input name="careerInterests" defaultValue={profile?.careerInterests.join(', ') ?? ''} /></label>
+      <label className="student-form-field"><span>Career interests, comma separated</span><input name="careerInterests" defaultValue={(profile?.careerInterests ?? []).join(', ')} /></label>
       <label className="student-form-field"><span>Portfolio URL</span><input name="portfolioUrl" defaultValue={profile?.portfolioUrl ?? ''} placeholder="https://..." /></label>
       <label className="student-form-field"><span>Summary</span><textarea name="profileSummary" defaultValue={profile?.profileSummary ?? ''} maxLength={2000} /></label>
-      <label className="student-form-field"><span>Visibility</span><select name="visibilityState" defaultValue={profile?.visibilityState ?? 'PRIVATE'}><option>PRIVATE</option><option>INSTITUTION_VISIBLE</option><option>EMPLOYER_DISCOVERY</option></select></label>
-      <label className="setting-row preference-row"><span>Employer discovery</span><input name="employerDiscoveryEnabled" type="checkbox" defaultChecked={profile?.employerDiscoveryEnabled ?? false} /></label>
+      <label className="student-form-field"><span>Visibility</span><select key={profile?.visibilityState ?? 'PRIVATE'} name="visibilityState" defaultValue={profile?.visibilityState ?? 'PRIVATE'}><option>PRIVATE</option><option>INSTITUTION_VISIBLE</option>{profile?.visibilityState === 'EMPLOYER_DISCOVERY' ? <option>EMPLOYER_DISCOVERY</option> : null}</select></label>
       <button type="submit">Save profile</button>
     </form>
   </div>;
@@ -909,7 +1163,7 @@ function AuthenticatedStudentDocuments(): React.ReactElement {
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     const token = getAccessToken();
-    if (!token) return setStatus('No protected access token is available.');
+    if (!token) return setStatus('Sign in again to continue.');
     const form = new FormData(event.currentTarget);
     try {
       await createStudentDocument(token, {
@@ -924,7 +1178,7 @@ function AuthenticatedStudentDocuments(): React.ReactElement {
       setStatus('Document metadata save failed.');
     }
   }
-  const verifiedCount = documents.filter((doc) => /verified/i.test(doc.verificationState ?? '')).length;
+  const verifiedCount = documents.filter(isDocumentVerified).length;
   const withFileCount = documents.filter((doc) => doc.file).length;
   return <div className="workspace-grid">
     <section className="card wide-card"><span className="eyebrow">Your documents</span><h2>Documents</h2><p role="status">{status}</p>
@@ -1009,7 +1263,7 @@ function StudentDocumentRow({ document: doc, onChanged, onStatus }: {
     <td>{doc.file
       ? <><strong>{doc.file.filename}</strong><br /><span className="hiring-meta">v{doc.file.versionNumber} · {Math.round(doc.file.byteSize / 1024)} KB · scanned clean</span></>
       : <span className="hiring-meta">No file attached</span>}</td>
-    <td>{doc.verificationState}</td>
+    <td>{documentVerificationLabel(doc)}</td>
     <td><div className="hiring-actions">
       <input ref={inputRef} type="file" accept={ACCEPTED_DOCUMENT_TYPES} className="visually-hidden-file"
         aria-label={`Attach a file to ${doc.title}`} disabled={busy || Boolean(doc.archivedAt)}
@@ -1029,16 +1283,16 @@ function AuthenticatedStudentSavedOpportunities(): React.ReactElement {
   const [status, setStatus] = useState('Loading saved opportunities...');
   const reload = async (): Promise<void> => {
     const token = getAccessToken();
-    if (!token) return setStatus('No protected access token is available.');
+    if (!token) return setStatus('Sign in again to continue.');
     const response = await listStudentSavedOpportunities(token);
     setSaved(response.savedOpportunities);
-    setStatus('Saved opportunities loaded.');
+    setStatus(response.savedOpportunities.length ? '' : 'Nothing saved yet.');
   };
   useEffect(() => { void reload().catch(() => setStatus('Saved opportunities could not be loaded.')); }, []);
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     const token = getAccessToken();
-    if (!token) return setStatus('No protected access token is available.');
+    if (!token) return setStatus('Sign in again to continue.');
     const form = new FormData(event.currentTarget);
     try {
       const response = await saveStudentOpportunity(token, {
@@ -1070,9 +1324,11 @@ function AuthenticatedStudentSavedOpportunities(): React.ReactElement {
 }
 
 function AuthenticatedStudentUnavailable({ route }: { readonly route: RouteKey }): React.ReactElement {
-  return <V2EmptyState icon="🧭" title={`${routeTitles[route].title} is not built yet`}
-    note="This module is on the roadmap but has no live workflow behind it yet — nothing here is hidden or broken."
-    hint="Your Home dashboard shows everything that is live for you today." />;
+  // The AI Career Coach has its own approved state; every other unbuilt page says so plainly.
+  if (route === 'ai-coach') return <EmptyState id="coach" note />;
+  return <EmptyState id="coming-soon" title={`${routeTitles[route].title} is not built yet`}
+    body="This section is planned but not available yet. Your Home dashboard shows everything that is live for you today."
+    primary={{ label: 'Go to Home', to: '/student', icon: 'home' }} />;
 }
 
 function currentPath(): string {
@@ -1086,6 +1342,23 @@ function normalizePath(path: string): string {
 function routeFromPath(path: string): RouteKey {
   const normalized = normalizePath(path);
   return navItems.find((item) => item.path === normalized)?.route ?? 'dashboard';
+}
+
+/** A student page the app has (the student navigation); anything else under /student is a 404. */
+function isKnownStudentPath(path: string): boolean {
+  const normalized = normalizePath(path);
+  return !normalized.startsWith('/student') || navItems.some((item) => item.path === normalized);
+}
+
+/** Paths the app answers outside the portals; a path matching none of these (or a portal) is a 404. */
+function isKnownAppPath(path: string): boolean {
+  const normalized = normalizePath(path);
+  if (isProtectedPortalPath(normalized)) return true;
+  if (['/', '/login', '/auth/callback', '/invitations/accept', '/forgot-password', '/privacy', '/terms', '/employer-access'].includes(normalized)) return true;
+  if (normalized.startsWith('/p/')) return true;
+  if (normalized === '/demo' || normalized.startsWith('/demo/')) return true;
+  if (import.meta.env.DEV && normalized.startsWith('/pilot-preview')) return true;
+  return false;
 }
 
 function isProtectedPortalPath(path: string): boolean {

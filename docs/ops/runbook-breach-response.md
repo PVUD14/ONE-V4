@@ -13,9 +13,16 @@ without instruction. Do not delete anything: evidence preservation beats tidines
 ## 1. Detect and declare (minutes)
 
 Treat it as an incident the moment there is *reasonable suspicion* — do not wait
-for proof. Start an incident log immediately (a timestamped note in the vault):
-who noticed what, when, and every action taken from here on. This log is what the
-Board notification, the user notification, and the post-mortem are written from.
+for proof. Declare it in the incident register (Operations → Security → Incident
+register, OPS-16) with category *Personal data breach* and the time of first
+suspicion as *detected at*; keep the timeline there: who noticed what, when, and
+every action taken from here on. This log is what the Board notification, the user
+notification, and the post-mortem are written from. If the console is unreachable,
+keep a timestamped note in the vault and copy it into the register afterwards.
+
+The register shows a 72-hour clock from *detected at*. That period comes from the
+ONE plan and is **pending legal confirmation** — the lawyer's advice on the DPDP
+Rules governs, not the clock.
 
 ## 2. Contain (first hour)
 
@@ -55,7 +62,15 @@ Answer four questions in writing, using evidence, not guesses:
 - **Affected users**: plain-language notice — what happened, what data, what we
   did, what they should do (e.g., change password), and the grievance contact.
 - **Affected institutions**: their placement leadership hears it from us before
-  they hear it from students.
+  they hear it from students. Name the affected organisations on the incident, then
+  send a status notice from an approved template (Operations → Settings → Status
+  communications); the notice reaches their administrators in ONE, and by email
+  once a mail service is configured.
+
+Record in the register when the Board was notified (with its acknowledgement
+reference) and when affected users were told. ONE sends nothing to the Board or
+to any outside party itself; the register records what a person did. A breach
+cannot be closed in the register until both are recorded.
 - If law enforcement is involved (theft, extortion), file and reference the FIR.
 
 Never minimise in a notification. State what is known, what is not yet known, and

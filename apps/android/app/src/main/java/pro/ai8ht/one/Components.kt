@@ -41,9 +41,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import pro.ai8ht.one.ui.LocalOnePalette
 import pro.ai8ht.one.ui.Tone
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
 /** Shared building blocks, all painted from the active OnePalette. */
 
@@ -127,12 +124,15 @@ internal fun SectionTitle(text: String, trailing: String? = null, onTrailing: ((
     }
 }
 
-internal fun prettify(code: String): String =
-    code.lowercase().replace('_', ' ').replaceFirstChar { it.uppercase() }
+/** A status, kind or stage code as plain words; the same mapping as [codeLabel]. */
+internal fun prettify(code: String): String = codeLabel(code)
 
-internal fun formatWhen(iso: String): String = runCatching {
-    DateTimeFormatter.ofPattern("d MMM, h:mm a").withZone(ZoneId.systemDefault()).format(Instant.parse(iso))
-}.getOrDefault(iso)
+/**
+ * Render a server timestamp for a person, as "7 Oct 2026, 17:18" — the web's
+ * formatDateTime. Postgres-shaped timestamps are handled by [parseDisplayDate]; a value
+ * that is not a date reads NA rather than leaking the raw text.
+ */
+internal fun formatWhen(iso: String): String = formatDateTime(iso)
 
 @Composable
 internal fun LoadingSpinner() {

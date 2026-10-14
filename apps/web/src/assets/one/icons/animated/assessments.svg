@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="ai ai-assessments ai-loop" role="img" aria-label="Assessments (animated)">
+<style>
+svg{color:#1554D6;fill:currentColor;overflow:visible}
+*{transform-box:view-box}
+.s{opacity:.42}.p-turn{opacity:0}.p-dB{opacity:0}.p-chk{stroke-dasharray:12;stroke-dashoffset:0}
+@keyframes aiTick{0%,22%,100%{stroke-dashoffset:0}1%{stroke-dashoffset:12}6%{stroke-dashoffset:12}20%{stroke-dashoffset:0}}
+@keyframes aiClip{0%,22%,100%{transform:none}8%{transform:translateY(-1.3px)}15%{transform:translateY(.3px)}}
+@media (prefers-reduced-motion: no-preference){
+.ai-loop .p-chk{animation:aiTick 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:12px 12px}
+.ai-loop .p-clip{animation:aiClip 2.8s cubic-bezier(.3,.7,.3,1) 0ms infinite;transform-origin:11px 4px}
+}
+</style>
+<defs><mask id="mk-as-x" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff"/><polyline class="p-chk" points="8.35,12.45 11.1,15.2 16.25,10.05" fill="none" stroke="#000" stroke-width="2.7" stroke-linejoin="round"/></mask></defs><path class="f" mask="url(#mk-as-x)" d="M4 6.1Q4 4.5 5.6 4.5L14.9 4.5Q16.5 4.5 17.63 5.63L18.87 6.87Q20 8 20 9.6L20 19.9Q20 21.5 18.4 21.5L5.6 21.5Q4 21.5 4 19.9Z"/><g class="s"><path class="f p-clip" fill-rule="evenodd" d="M8 3.4Q8 2.2 9.2 2.2L12.8 2.2Q14 2.2 14 3.4L14 5.4Q14 6.6 12.8 6.6L9.2 6.6Q8 6.6 8 5.4Z"/></g>
+</svg>

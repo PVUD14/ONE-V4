@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { ArrowRight, Award, BookOpen, Bookmark, Building2, CalendarDays, CheckCircle2, ClipboardCheck, Clock, Download, Flame, Lock, Play, Sparkles, Star, Target, TrendingUp, Trophy } from 'lucide-react';
-import { MultiRing, Ring, Spark, WeekBars, toneColor } from './pilotComponents.js';
+import { Icon, type IconName } from '../icons/Icon.js';
+import { MultiRing, Ring, Spark, WeekBars, toneColor, toneMix } from './pilotComponents.js';
 import { DetailRows, OverlayForm, PilotTabs, downloadCsv, listModal, useOverlay } from './pilotOverlay.js';
 import { usePilotSession } from './pilotSession.js';
 import { PhotoUploadControl, PilotAvatar, shareProfileModal } from './pilotShare.js';
@@ -25,6 +25,9 @@ import {
 // ---------------------------------------------------------------------------
 // Dashboard
 // ---------------------------------------------------------------------------
+
+/** The real application's advisory bands, lowest first. Readiness is never a number. */
+const READINESS_LADDER: readonly string[] = ['Not enough evidence', 'Developing', 'Progressing', 'Ready for next step'];
 
 export function PilotDashboard(): React.ReactElement {
   const canon = pilotCanon;
@@ -62,19 +65,21 @@ export function PilotDashboard(): React.ReactElement {
           <h1>Good morning, {pilotPersona.firstName}! 👋</h1>
           <p>Let&apos;s continue your journey and get one step closer to your dream career.</p>
         </div>
-        <button type="button" className="pilot-btn ghost"><CalendarDays size={15} /> View Calendar</button>
+        <button type="button" className="pilot-btn ghost"><Icon name="calendar-small" size={16} /> View Calendar</button>
       </div>
 
       <div className="pilot-row" style={{ gridTemplateColumns: 'minmax(0, 2.4fr) repeat(5, minmax(0, 1fr))' }}>
         <section className="pilot-card">
-          <h2>Career Readiness Score</h2>
-          <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'nowrap' }}>
-            <div style={{ minWidth: 0 }}>
-              <span style={{ fontSize: 32, fontWeight: 800, lineHeight: 1 }}>{canon.readiness}<span style={{ fontSize: 14, color: 'var(--p-muted)', fontWeight: 600 }}>/100</span></span>
-              <div style={{ marginTop: 7 }}><span className="pilot-chip green">{canon.readinessLabel}</span></div>
-              <div style={{ marginTop: 11 }}><button type="button" className="pilot-btn soft small">View Full Report</button></div>
+          <h2>Career Readiness</h2>
+          <div style={{ minWidth: 0 }}>
+            <span style={{ fontSize: 24, fontWeight: 800, lineHeight: 1.1 }}>{canon.readinessBand}</span>
+            <small style={{ display: 'block', color: 'var(--p-muted)', marginTop: 3 }}>Advisory band · never a score · never shown to employers</small>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, marginTop: 9 }} role="img" aria-label={`Readiness band ladder: ${canon.readinessBand}`}>
+              {READINESS_LADDER.map((band) => (
+                <span key={band} title={band} style={{ height: 7, borderRadius: 999, background: READINESS_LADDER.indexOf(band) <= READINESS_LADDER.indexOf(canon.readinessBand) ? 'var(--p-blue)' : '#edf1f7' }} />
+              ))}
             </div>
-            <Ring value={canon.readiness} size={66} stroke={8} tone="blue"><span style={{ fontSize: 18 }}>{canon.readiness}</span></Ring>
+            <div style={{ marginTop: 11 }}><button type="button" className="pilot-btn soft small">View Full Report</button></div>
           </div>
         </section>
         {pilotScores.map((score) => (
@@ -95,7 +100,7 @@ export function PilotDashboard(): React.ReactElement {
               <div key={task.title} className="pilot-list-row">
                 <button type="button" className="pilot-check" aria-label={`Mark ${task.title} done`}
                   onClick={(event) => { event.stopPropagation(); toggleTask(task.title); }}>
-                  <CheckCircle2 size={17} color={doneTasks.has(task.title) ? '#12996b' : '#c2ccda'} />
+                  <Icon name="check" size={16} style={{ color: doneTasks.has(task.title) ? '#12996b' : '#c2ccda' }} />
                 </button>
                 <div className="grow"><strong style={doneTasks.has(task.title) ? { color: 'var(--p-muted)' } : undefined}>{task.title}</strong></div>
                 <small>{task.minutes} min</small>
@@ -108,7 +113,7 @@ export function PilotDashboard(): React.ReactElement {
         <section className="pilot-card">
           <h2>Continue Learning</h2>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <span className="pilot-tile purple"><BookOpen size={19} /></span>
+            <span className="pilot-tile purple"><Icon name="learning" size={20} /></span>
             <div style={{ minWidth: 0, flex: 1 }}>
               <strong style={{ fontSize: 13 }}>Data Structures in C</strong>
               <small style={{ display: 'block', color: 'var(--p-muted)' }}>Arrays and Strings</small>
@@ -118,7 +123,7 @@ export function PilotDashboard(): React.ReactElement {
             <div className="pilot-bar" style={{ flex: 1 }}><i style={{ width: '66%' }} /></div>
             <small style={{ color: 'var(--p-muted)' }}>66%</small>
           </div>
-          <button type="button" className="pilot-btn soft small"><Play size={13} /> Resume Lesson</button>
+          <button type="button" className="pilot-btn soft small"><Icon name="arrow-right" size={16} /> Resume Lesson</button>
         </section>
 
         <section className="pilot-card">
@@ -127,9 +132,9 @@ export function PilotDashboard(): React.ReactElement {
           <div className="pilot-list">
             {pilotUpcoming.map((item) => (
               <div key={item.title} className="pilot-list-row">
-                <span className="pilot-tile blue"><CalendarDays size={17} /></span>
+                <span className="pilot-tile blue"><Icon name="calendar" size={16} /></span>
                 <div className="grow"><strong>{item.title}</strong><small>{item.when}</small></div>
-                <ArrowRight size={15} color="#98a5ba" />
+                <Icon name="arrow-right" size={16} style={{ color: "#98a5ba" }} />
               </div>
             ))}
           </div>
@@ -142,7 +147,7 @@ export function PilotDashboard(): React.ReactElement {
           <div className="pilot-row cols-4">
             {pilotRecommendedCourses.map((course) => (
               <div key={course.title} className="pilot-course-card">
-                <span className="pilot-tile" style={{ background: `${toneColor(course.tone)}1a`, color: toneColor(course.tone) }}><BookOpen size={18} /></span>
+                <span className="pilot-tile" style={{ background: toneMix(course.tone, 10), color: toneColor(course.tone) }}><Icon name="learning" size={20} /></span>
                 <strong>{course.title}</strong>
                 <small>{course.lessons} Lessons</small>
                 <button type="button" className="pilot-btn soft small">Start</button>
@@ -155,12 +160,12 @@ export function PilotDashboard(): React.ReactElement {
           <h2>Quick Actions</h2>
           <div className="pilot-row cols-2">
             {[
-              ['Take a Mock Test', ClipboardCheck], ['Practice Questions', Target],
-              ['Build Resume', BookOpen], ['Explore Roles', Building2],
-              ['Update Profile', Star], ['View Scholarships', Award],
-            ].map(([label, Icon]) => (
+              ['Take a Mock Test', 'assessments'], ['Practice Questions', 'targets'],
+              ['Build Resume', 'resume'], ['Explore Roles', 'opportunities'],
+              ['Update Profile', 'profile'], ['View Scholarships', 'scholarships'],
+            ].map(([label, glyph]) => (
               <button key={label as string} type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}>
-                {(() => { const Component = Icon as typeof Target; return <Component size={15} />; })()}
+                <Icon name={glyph as IconName} size={16} />
                 {label as string}
               </button>
             ))}
@@ -174,7 +179,7 @@ export function PilotDashboard(): React.ReactElement {
           <div className="pilot-list">
             {pilotRecentActivity.map((entry) => (
               <div key={entry.title} className="pilot-list-row">
-                <span className={`pilot-tile ${entry.tone}`}><TrendingUp size={16} /></span>
+                <span className={`pilot-tile ${entry.tone}`}><Icon name="analytics" size={16} /></span>
                 <div className="grow"><strong>{entry.title}</strong></div>
                 <small>{entry.when}</small>
               </div>
@@ -187,7 +192,7 @@ export function PilotDashboard(): React.ReactElement {
           <div className="pilot-row cols-4">
             {pilotBadges.map((badge) => (
               <div key={badge.label} style={{ textAlign: 'center' }}>
-                <span className={`pilot-tile ${badge.tone}`} style={{ margin: '0 auto 8px' }}><Trophy size={18} /></span>
+                <span className={`pilot-tile ${badge.tone}`} style={{ margin: '0 auto 8px' }}><Icon name="offers" size={20} /></span>
                 <small style={{ display: 'block', fontSize: 11, color: 'var(--p-ink-2)', fontWeight: 600 }}>{badge.label}</small>
               </div>
             ))}
@@ -209,7 +214,7 @@ export function PilotDashboard(): React.ReactElement {
     <aside className="pilot-rail">
       <section className="pilot-card">
         <div className="pilot-card-head">
-          <h2><Flame size={15} color="#f59e0b" style={{ verticalAlign: '-2px' }} /> {pilotCanon.streakDays} Day Streak</h2>
+          <h2><Icon name="skills" size={16} style={{ color: "#f59e0b", verticalAlign: '-2px' }} /> {pilotCanon.streakDays} Day Streak</h2>
           <small style={{ color: 'var(--p-muted)' }}>Keep it up!</small>
         </div>
         <div className="pilot-streak-days">
@@ -290,7 +295,7 @@ export function PilotRoadmap(): React.ReactElement {
       <section className="pilot-card">
         <div className="pilot-row cols-3">
           <div style={{ display: 'flex', gap: 13, alignItems: 'center' }}>
-            <span className="pilot-tile green"><Target size={19} /></span>
+            <span className="pilot-tile green"><Icon name="targets" size={20} /></span>
             <div>
               <small style={{ color: 'var(--p-muted)' }}>Current Goal</small>
               <strong style={{ display: 'block', fontSize: 16 }}>{pilotPersona.careerGoal}</strong>
@@ -318,7 +323,7 @@ export function PilotRoadmap(): React.ReactElement {
         {pilotRoadmapPhases.map((phase) => (
           <button key={phase.label} type="button" className={`pilot-phase ${activePhase === phase.label ? 'active' : ''}`}
             onClick={(event) => { event.stopPropagation(); setActivePhase(phase.label); }}>
-            <span className={`pilot-tile ${activePhase === phase.label ? 'green' : 'blue'}`} style={{ width: 32, height: 32 }}><ClipboardCheck size={15} /></span>
+            <span className={`pilot-tile ${activePhase === phase.label ? 'green' : 'blue'}`} style={{ width: 32, height: 32 }}><Icon name="assessments" size={16} /></span>
             <div><strong>{phase.label}</strong><small>{phase.done} / {phase.total} Completed</small></div>
           </button>
         ))}
@@ -349,7 +354,7 @@ export function PilotRoadmap(): React.ReactElement {
               ) : step.status === 'current' ? (
                 <button type="button" className="pilot-btn small">Continue</button>
               ) : (
-                <span className="pilot-chip slate"><Lock size={11} /> Locked</span>
+                <span className="pilot-chip slate"><Icon name="lock" size={16} /> Locked</span>
               )}
             </div>
           </div>
@@ -381,11 +386,11 @@ export function PilotRoadmap(): React.ReactElement {
       <section className="pilot-card">
         <h2>Recommended Next</h2>
         <div style={{ display: 'flex', gap: 12 }}>
-          <span className="pilot-tile purple"><Sparkles size={18} /></span>
+          <span className="pilot-tile purple"><Icon name="coach" size={20} /></span>
           <div>
             <strong style={{ fontSize: 13 }}>Practice Array Problems</strong>
             <small style={{ display: 'block', color: 'var(--p-muted)', margin: '3px 0 8px' }}>Strengthen your problem solving skills with arrays.</small>
-            <button type="button" className="pilot-btn soft small">Start Practice <ArrowRight size={13} /></button>
+            <button type="button" className="pilot-btn soft small">Start Practice <Icon name="arrow-right" size={16} /></button>
           </div>
         </div>
       </section>
@@ -394,7 +399,7 @@ export function PilotRoadmap(): React.ReactElement {
         <div className="pilot-list">
           {pilotRoadmapTips.map((tip) => (
             <div key={tip} className="pilot-list-row" style={{ padding: '8px 2px' }}>
-              <CheckCircle2 size={15} color="#1f55e5" />
+              <Icon name="check" size={16} style={{ color: "#1f55e5" }} />
               <small style={{ color: 'var(--p-ink-2)' }}>{tip}</small>
             </div>
           ))}
@@ -424,7 +429,7 @@ export function PilotLearn(): React.ReactElement {
           <div className="pilot-list">
             {tabMyLearning.map((course) => (
               <div key={course.title} className="pilot-list-row">
-                <span className="pilot-tile purple"><BookOpen size={16} /></span>
+                <span className="pilot-tile purple"><Icon name="learning" size={16} /></span>
                 <div className="grow"><strong>{course.title}</strong><small>{course.detail}</small></div>
                 <div className="pilot-bar thin" style={{ width: 110 }}><i style={{ width: `${course.progress}%` }} /></div>
                 <button type="button" className="pilot-btn ghost small">Resume</button>
@@ -439,7 +444,7 @@ export function PilotLearn(): React.ReactElement {
           <div className="pilot-row cols-2">
             {pilotLearningPaths.map((path) => (
               <div key={path.title} className="pilot-course-card">
-                <span className="pilot-tile blue"><Target size={18} /></span>
+                <span className="pilot-tile blue"><Icon name="targets" size={20} /></span>
                 <strong>{path.title}</strong>
                 <small>{path.detail}</small>
                 <small>{path.courses} Courses · {path.hours} hrs</small>
@@ -459,7 +464,7 @@ export function PilotLearn(): React.ReactElement {
           <div className="pilot-list">
             {tabBookmarks.map((entry) => (
               <div key={entry.title} className="pilot-list-row">
-                <Bookmark size={15} color="#1f55e5" fill="#1f55e5" />
+                <Icon name="career" size={16} style={{ color: "#1f55e5" }} />
                 <div className="grow"><strong>{entry.title}</strong><small>{entry.detail}</small></div>
                 <button type="button" className="pilot-btn ghost small">Start</button>
               </div>
@@ -473,19 +478,19 @@ export function PilotLearn(): React.ReactElement {
           <div className="pilot-list">
             {tabCertificates.map((certificate) => (
               <div key={certificate.title} className="pilot-list-row">
-                <span className="pilot-tile green"><Award size={16} /></span>
+                <span className="pilot-tile green"><Icon name="offers" size={16} /></span>
                 <div className="grow"><strong>{certificate.title}</strong><small>{certificate.detail} · {certificate.id}</small></div>
                 <button type="button" className="pilot-btn ghost small" onClick={(event) => {
                   event.stopPropagation();
                   downloadCsv(`${certificate.id}.csv`, [
-                    ['ONE by Ai8ht — Course Completion Certificate (sample)'],
+                    ['ONE by AI8HT — Course Completion Certificate (sample)'],
                     ['Certificate ID', certificate.id],
                     ['Awarded to', 'Arjun Reddy'],
                     ['Course', certificate.title],
                     ['Detail', certificate.detail],
                   ]);
                   overlay.toast(`${certificate.id} downloaded (sample certificate).`);
-                }}><Download size={13} /> Download</button>
+                }}><Icon name="download" size={16} /> Download</button>
               </div>
             ))}
           </div>
@@ -504,7 +509,7 @@ export function PilotLearn(): React.ReactElement {
           </div>
           <small style={{ color: 'var(--p-muted)' }}>{pilotContinueLearning.minutesLeft} mins left</small>
         </div>
-        <button type="button" className="pilot-btn"><Play size={15} /> Continue</button>
+        <button type="button" className="pilot-btn"><Icon name="arrow-right" size={16} /> Continue</button>
       </section>
 
       <section className="pilot-card">
@@ -513,9 +518,9 @@ export function PilotLearn(): React.ReactElement {
         <div className="pilot-row cols-5">
           {pilotPopularCourses.map((course) => (
             <div key={course.title} className="pilot-course-card">
-              <div className="pilot-course-art" style={{ background: `linear-gradient(135deg, ${toneColor(course.tone)}cc, ${toneColor(course.tone)})` }}><BookOpen size={24} /></div>
+              <div className="pilot-course-art" style={{ background: `linear-gradient(135deg, ${toneMix(course.tone, 80)}, ${toneColor(course.tone)})` }}><Icon name="learning" size={24} /></div>
               <strong>{course.title}</strong>
-              <small><Star size={11} color="#f59e0b" fill="#f59e0b" style={{ verticalAlign: '-1px' }} /> {course.rating} ({course.learners}) · {course.level}</small>
+              <small><Icon name="offers" size={16} style={{ color: "#f59e0b", verticalAlign: '-1px' }} /> {course.rating} ({course.learners}) · {course.level}</small>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div className="pilot-bar thin" style={{ flex: 1 }}><i style={{ width: `${course.progress}%` }} /></div>
                 <small>{course.progress}%</small>
@@ -531,7 +536,7 @@ export function PilotLearn(): React.ReactElement {
         <div className="pilot-row cols-4">
           {pilotLearningPaths.map((path) => (
             <div key={path.title} className="pilot-course-card">
-              <span className="pilot-tile blue"><Target size={18} /></span>
+              <span className="pilot-tile blue"><Icon name="targets" size={20} /></span>
               <strong>{path.title}</strong>
               <small>{path.detail}</small>
               <small>{path.courses} Courses · {path.hours} hrs</small>
@@ -549,7 +554,7 @@ export function PilotLearn(): React.ReactElement {
         <div className="pilot-list">
           {pilotLeftOff.map((entry) => (
             <div key={entry.title} className="pilot-list-row">
-              <span className="pilot-tile indigo"><Play size={16} /></span>
+              <span className="pilot-tile indigo"><Icon name="arrow-right" size={16} /></span>
               <div className="grow"><strong>{entry.title}</strong><small>{entry.course} · Last watched {entry.watched}</small></div>
               <div className="pilot-bar thin" style={{ width: 110 }}><i style={{ width: `${entry.progress}%` }} /></div>
               <small>{entry.progress}%</small>
@@ -590,10 +595,10 @@ export function PilotLearn(): React.ReactElement {
         <div className="pilot-list">
           {pilotLearnRecommended.map((course) => (
             <div key={course.title} className="pilot-list-row">
-              <span className="pilot-tile teal"><BookOpen size={16} /></span>
+              <span className="pilot-tile teal"><Icon name="learning" size={16} /></span>
               <div className="grow"><strong>{course.title}</strong><small>{course.level}</small></div>
-              <small><Star size={11} color="#f59e0b" fill="#f59e0b" style={{ verticalAlign: '-1px' }} /> {course.rating}</small>
-              <Bookmark size={14} color="#98a5ba" />
+              <small><Icon name="offers" size={16} style={{ color: "#f59e0b", verticalAlign: '-1px' }} /> {course.rating}</small>
+              <Icon name="career" size={16} style={{ color: "#98a5ba" }} />
             </div>
           ))}
         </div>
@@ -601,9 +606,9 @@ export function PilotLearn(): React.ReactElement {
       <section className="pilot-card">
         <h2>Achievements</h2>
         <div className="pilot-row cols-3" style={{ textAlign: 'center' }}>
-          <div><span className="pilot-tile amber" style={{ margin: '0 auto 6px' }}><Flame size={17} /></span><b style={{ fontSize: 16 }}>{pilotCanon.streakDays}</b><small style={{ display: 'block', color: 'var(--p-muted)', fontSize: 10.5 }}>Day Streak</small></div>
-          <div><span className="pilot-tile purple" style={{ margin: '0 auto 6px' }}><Trophy size={17} /></span><b style={{ fontSize: 16 }}>{pilotCanon.coursesCompleted}</b><small style={{ display: 'block', color: 'var(--p-muted)', fontSize: 10.5 }}>Courses Completed</small></div>
-          <div><span className="pilot-tile green" style={{ margin: '0 auto 6px' }}><Star size={17} /></span><b style={{ fontSize: 16 }}>{pilotCanon.points}</b><small style={{ display: 'block', color: 'var(--p-muted)', fontSize: 10.5 }}>Points Earned</small></div>
+          <div><span className="pilot-tile amber" style={{ margin: '0 auto 6px' }}><Icon name="skills" size={16} /></span><b style={{ fontSize: 16 }}>{pilotCanon.streakDays}</b><small style={{ display: 'block', color: 'var(--p-muted)', fontSize: 10.5 }}>Day Streak</small></div>
+          <div><span className="pilot-tile purple" style={{ margin: '0 auto 6px' }}><Icon name="offers" size={16} /></span><b style={{ fontSize: 16 }}>{pilotCanon.coursesCompleted}</b><small style={{ display: 'block', color: 'var(--p-muted)', fontSize: 10.5 }}>Courses Completed</small></div>
+          <div><span className="pilot-tile green" style={{ margin: '0 auto 6px' }}><Icon name="offers" size={16} /></span><b style={{ fontSize: 16 }}>{pilotCanon.points}</b><small style={{ display: 'block', color: 'var(--p-muted)', fontSize: 10.5 }}>Points Earned</small></div>
         </div>
       </section>
     </aside> : null}
@@ -650,7 +655,7 @@ export function PilotAssessments(): React.ReactElement {
           <div className="pilot-list">
             {tabPastAttempts.map((attempt) => (
               <div key={attempt.title} className="pilot-list-row">
-                <span className="pilot-tile indigo" style={{ width: 34, height: 34 }}><ClipboardCheck size={15} /></span>
+                <span className="pilot-tile indigo" style={{ width: 34, height: 34 }}><Icon name="assessments" size={16} /></span>
                 <div className="grow"><strong style={{ fontSize: 12.5 }}>{attempt.title}</strong><small>{attempt.when}</small></div>
                 <span className={`pilot-chip ${attempt.score >= 70 ? 'green' : attempt.score >= 40 ? 'amber' : 'rose'}`}>{attempt.score}%</span>
                 <button type="button" className="pilot-btn ghost small">Review Answers</button>
@@ -686,7 +691,7 @@ export function PilotAssessments(): React.ReactElement {
       {tab === 0 ? <>
       <section className="pilot-hero">
         <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-          <span className="pilot-tile blue" style={{ width: 48, height: 48 }}><ClipboardCheck size={22} /></span>
+          <span className="pilot-tile blue" style={{ width: 48, height: 48 }}><Icon name="assessments" size={24} /></span>
           <div>
             <h2>Assess. Analyze. Advance.</h2>
             <p>Regular practice helps you identify strengths, improve weak areas and stay ahead.</p>
@@ -704,7 +709,7 @@ export function PilotAssessments(): React.ReactElement {
         <div className="pilot-row cols-5">
           {pilotRecommendedTests.map((test) => (
             <div key={test.title} className="pilot-course-card">
-              <span className="pilot-tile" style={{ background: `${toneColor(test.tone)}1a`, color: toneColor(test.tone) }}><ClipboardCheck size={17} /></span>
+              <span className="pilot-tile" style={{ background: toneMix(test.tone, 10), color: toneColor(test.tone) }}><Icon name="assessments" size={16} /></span>
               <strong>{test.title}</strong>
               <span className={`pilot-chip ${test.difficulty === 'Easy' ? 'green' : test.difficulty === 'Medium' ? 'amber' : 'rose'}`}>{test.difficulty}</span>
               <small>{test.questions} Qs · {test.minutes} mins</small>
@@ -720,7 +725,7 @@ export function PilotAssessments(): React.ReactElement {
         <div className="pilot-row cols-5">
           {pilotTestCategories.map((category) => (
             <div key={category.label} className="pilot-cat">
-              <span className="pilot-tile blue" style={{ width: 32, height: 32 }}><Target size={14} /></span>
+              <span className="pilot-tile blue" style={{ width: 32, height: 32 }}><Icon name="targets" size={16} /></span>
               <div><strong>{category.label}</strong><small>{category.count} Tests</small></div>
             </div>
           ))}
@@ -767,7 +772,7 @@ export function PilotAssessments(): React.ReactElement {
         <div className="pilot-list">
           {pilotRecentTests.map((test) => (
             <div key={test.title} className="pilot-list-row">
-              <span className="pilot-tile indigo" style={{ width: 34, height: 34 }}><ClipboardCheck size={15} /></span>
+              <span className="pilot-tile indigo" style={{ width: 34, height: 34 }}><Icon name="assessments" size={16} /></span>
               <div className="grow"><strong style={{ fontSize: 12.5 }}>{test.title}</strong><small>{test.when}</small></div>
               <span className={`pilot-chip ${test.score >= 70 ? 'green' : test.score >= 40 ? 'amber' : 'rose'}`}>{test.score}%</span>
             </div>
@@ -800,7 +805,7 @@ export function PilotAssessments(): React.ReactElement {
         <small style={{ color: 'var(--p-muted)' }}>Attempt 2 tests every day</small>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 9 }}>
           <div className="pilot-bar" style={{ flex: 1 }}><i style={{ width: '50%' }} /></div>
-          <span className="pilot-chip amber"><Flame size={11} /> {pilotCanon.streakDays} Day Streak</span>
+          <span className="pilot-chip amber"><Icon name="skills" size={16} /> {pilotCanon.streakDays} Day Streak</span>
         </div>
         <small style={{ color: 'var(--p-muted)' }}>1 / 2 tests completed</small>
       </section>
@@ -825,7 +830,7 @@ export function PilotOpportunities(): React.ReactElement {
       subtitle: `${company} · Sample application`,
       body: <OverlayForm
         fields={[
-          { label: 'Applying as', value: 'Arjun Reddy · VIT Chennai' },
+          { label: 'Applying as', value: 'Arjun Reddy · Lakeview Institute' },
           { label: 'Resume', type: 'select', value: 'Software Engineer Resume (score 78)', options: ['Software Engineer Resume (score 78)', 'Internship Resume (score 72)', 'Campus Placement Resume (score 68)'] },
           { label: 'Cover note', type: 'textarea', placeholder: 'A short note to the recruiter (optional)' },
         ]}
@@ -893,7 +898,7 @@ export function PilotOpportunities(): React.ReactElement {
           <div className="pilot-row cols-4">
             {pilotAchievements.map((achievement) => (
               <div key={achievement.title} className="pilot-course-card">
-                <span className={`pilot-tile ${achievement.tone}`}><Trophy size={17} /></span>
+                <span className={`pilot-tile ${achievement.tone}`}><Icon name="offers" size={16} /></span>
                 <strong>{achievement.title}</strong>
                 <small>{achievement.detail}</small>
                 <small style={{ color: 'var(--p-muted)' }}>{achievement.when}</small>
@@ -913,7 +918,7 @@ export function PilotOpportunities(): React.ReactElement {
               ['Interviews', applications.interviews, 'purple'], ['Offers', applications.offers, 'amber'],
             ].map(([label, value, tone]) => (
               <div key={label as string} className="pilot-stat">
-                <span className={`pilot-tile ${tone as string}`}><Building2 size={17} /></span>
+                <span className={`pilot-tile ${tone as string}`}><Icon name="company" size={16} /></span>
                 <div><b>{value as number}</b><small>{label as string}</small></div>
               </div>
             ))}
@@ -934,7 +939,7 @@ export function PilotOpportunities(): React.ReactElement {
               <span className={`pilot-chip ${opportunity.matchBand === 'High Match' ? 'green' : opportunity.matchBand === 'Medium Match' ? 'amber' : 'blue'}`}>{opportunity.matchBand}</span>
               <b style={{ fontSize: 13 }}>{opportunity.match}%</b>
               <small style={{ color: 'var(--p-muted)' }}>{opportunity.posted}</small>
-              <Bookmark size={15} color="#98a5ba" />
+              <Icon name="career" size={16} style={{ color: "#98a5ba" }} />
               {appliedRoles.has(`${opportunity.company.name}-${opportunity.role}`) ? (
                 <button type="button" className="pilot-btn ghost small" disabled>Applied ✓</button>
               ) : (
@@ -955,7 +960,7 @@ export function PilotOpportunities(): React.ReactElement {
                 event.stopPropagation();
                 overlay.openModal(listModal(category.label, `${category.count} roles in this category (sample)`, (tabCategoryRoles[category.label] ?? []).map((role) => ({ title: role }))));
               }}>
-              <span className="pilot-tile indigo" style={{ width: 32, height: 32 }}><Building2 size={14} /></span>
+              <span className="pilot-tile indigo" style={{ width: 32, height: 32 }}><Icon name="company" size={16} /></span>
               <div><strong>{category.label}</strong><small>{category.count} Jobs</small></div>
             </button>
           ))}
@@ -982,7 +987,7 @@ export function PilotOpportunities(): React.ReactElement {
           </div>
         </div>
       </section>
-      <div className="pilot-banner"><TrendingUp size={17} /> Keep applying! You&apos;re 20% more active than last month.</div>
+      <div className="pilot-banner"><Icon name="analytics" size={16} /> Keep applying! You&apos;re 20% more active than last month.</div>
       <section className="pilot-card">
         <div className="pilot-card-head"><h2>Saved Opportunities</h2><button type="button" className="pilot-link">View All</button></div>
         <div className="pilot-list">
@@ -990,7 +995,7 @@ export function PilotOpportunities(): React.ReactElement {
             <div key={`${saved.company.name}-${saved.role}`} className="pilot-list-row">
               <span className={`pilot-mark ${saved.company.tone}`} style={{ width: 36, height: 36, fontSize: 11.5 }}>{saved.company.mark}</span>
               <div className="grow"><strong style={{ fontSize: 12.5 }}>{saved.role}</strong><small>{saved.company.name} · {saved.location}</small></div>
-              <Bookmark size={14} color="#1f55e5" fill="#1f55e5" />
+              <Icon name="career" size={16} style={{ color: "#1f55e5" }} />
             </div>
           ))}
         </div>
@@ -1027,11 +1032,45 @@ function ProfileRecordList({ title, rows, action }: { readonly title: string; re
     <div className="pilot-list">
       {rows.map((row) => (
         <div key={row.title} className="pilot-list-row">
-          <span className="pilot-tile blue" style={{ width: 34, height: 34 }}><Star size={15} /></span>
+          <span className="pilot-tile blue" style={{ width: 34, height: 34 }}><Icon name="offers" size={16} /></span>
           <div className="grow"><strong style={{ fontSize: 12.5 }}>{row.title}</strong><small>{row.detail}</small></div>
           {action ? <button type="button" className="pilot-btn ghost small">{action}</button> : null}
         </div>
       ))}
+    </div>
+  </section>;
+}
+
+/**
+ * The student decides who sees what. Mirrors the real application's consent model:
+ * evidence goes to an employer only for an application the student made, and the
+ * readiness band never leaves ONE's student and college views.
+ */
+function ConsentCard(): React.ReactElement {
+  const overlay = useOverlay();
+  const [choices, setChoices] = useState<Readonly<Record<string, boolean>>>({
+    'Share verified skill evidence with employers I apply to': true,
+    'Let my placement cell nominate me for campus drives': true,
+    'Show my public profile link to anyone I send it to': false,
+  });
+  return <section className="pilot-card">
+    <h2>Privacy &amp; Consent</h2>
+    <div className="pilot-list">
+      {Object.entries(choices).map(([label, on]) => (
+        <div key={label} className="pilot-list-row" style={{ padding: '8px 2px' }}>
+          <div className="grow"><small style={{ color: 'var(--p-ink-2)' }}>{label}</small></div>
+          <button type="button" className={`pilot-btn small ${on ? '' : 'ghost'}`} aria-pressed={on}
+            onClick={(event) => {
+              event.stopPropagation();
+              setChoices((previous) => ({ ...previous, [label]: !on }));
+              overlay.toast(`${on ? 'Turned off' : 'Turned on'}: ${label.toLowerCase()} (sample).`);
+            }}>{on ? 'On' : 'Off'}</button>
+        </div>
+      ))}
+      <div className="pilot-list-row" style={{ padding: '8px 2px' }}>
+        <div className="grow"><small style={{ color: 'var(--p-ink-2)' }}>Readiness band visible to employers</small></div>
+        <span className="pilot-chip slate">Never</span>
+      </div>
     </div>
   </section>;
 }
@@ -1114,7 +1153,7 @@ export function PilotProfile(): React.ReactElement {
           <div className="pilot-row cols-4">
             {pilotAchievements.map((achievement) => (
               <div key={achievement.title} className="pilot-course-card">
-                <span className={`pilot-tile ${achievement.tone}`}><Trophy size={17} /></span>
+                <span className={`pilot-tile ${achievement.tone}`}><Icon name="offers" size={16} /></span>
                 <strong>{achievement.title}</strong>
                 <small>{achievement.detail}</small>
               </div>
@@ -1148,7 +1187,7 @@ export function PilotProfile(): React.ReactElement {
             <div className="pilot-legend" style={{ flex: 1 }}>
               {pilotProfileChecklist.map((item) => (
                 <div key={item.label}>
-                  <CheckCircle2 size={14} color={item.state === 'done' ? '#12996b' : item.state === 'progress' ? '#1f55e5' : '#c2ccda'} />
+                  <Icon name="check" size={16} style={{ color: item.state === 'done' ? '#12996b' : item.state === 'progress' ? '#1f55e5' : '#c2ccda' }} />
                   <span style={{ color: item.state === 'todo' ? 'var(--p-muted)' : 'inherit' }}>{item.label}</span>
                 </div>
               ))}
@@ -1161,13 +1200,13 @@ export function PilotProfile(): React.ReactElement {
           <h2>Career Snapshot</h2>
           <div className="pilot-row cols-2">
             {[
-              ['Assessments Taken', `${pilotCanon.testsAttempted}`, 'blue', ClipboardCheck],
-              ['Average Score', `${pilotCanon.averageScore}%`, 'rose', TrendingUp],
-              ['Companies Followed', '24', 'purple', Building2],
-              ['Applications', `${pilotCanon.applications.applied}`, 'green', Target],
-            ].map(([label, value, tone, Icon]) => (
+              ['Assessments Taken', `${pilotCanon.testsAttempted}`, 'blue', 'assessments'],
+              ['Average Score', `${pilotCanon.averageScore}%`, 'rose', 'analytics'],
+              ['Companies Followed', '24', 'purple', 'company'],
+              ['Applications', `${pilotCanon.applications.applied}`, 'green', 'applications'],
+            ].map(([label, value, tone, glyph]) => (
               <div key={label as string} className="pilot-stat" style={{ border: '1px solid var(--p-line)', borderRadius: 12, padding: '11px 13px' }}>
-                {(() => { const Component = Icon as typeof Target; return <span className={`pilot-tile ${tone as string}`}><Component size={16} /></span>; })()}
+                <span className={`pilot-tile ${tone as string}`}><Icon name={glyph as IconName} size={16} /></span>
                 <div><b>{value as string}</b><small>{label as string}</small></div>
               </div>
             ))}
@@ -1193,7 +1232,7 @@ export function PilotProfile(): React.ReactElement {
           <div className="pilot-list">
             {pilotRecentActivity.map((entry) => (
               <div key={entry.title} className="pilot-list-row" style={{ padding: '9px 2px' }}>
-                <span className={`pilot-tile ${entry.tone}`} style={{ width: 32, height: 32 }}><TrendingUp size={14} /></span>
+                <span className={`pilot-tile ${entry.tone}`} style={{ width: 32, height: 32 }}><Icon name="analytics" size={16} /></span>
                 <div className="grow"><strong style={{ fontSize: 12.5 }}>{entry.title}</strong></div>
                 <small>{entry.when}</small>
               </div>
@@ -1208,7 +1247,7 @@ export function PilotProfile(): React.ReactElement {
         <div className="pilot-row cols-4">
           {pilotAchievements.map((achievement) => (
             <div key={achievement.title} className="pilot-course-card">
-              <span className={`pilot-tile ${achievement.tone}`}><Trophy size={17} /></span>
+              <span className={`pilot-tile ${achievement.tone}`}><Icon name="offers" size={16} /></span>
               <strong>{achievement.title}</strong>
               <small>{achievement.detail}</small>
               <small style={{ color: 'var(--p-muted)' }}>{achievement.when}</small>
@@ -1247,23 +1286,24 @@ export function PilotProfile(): React.ReactElement {
                 else if (index === 2) session.navigate('learn');
                 else setTab(7);
               }}>
-              <span className="pilot-tile amber" style={{ width: 32, height: 32 }}><Sparkles size={14} /></span>
+              <span className="pilot-tile amber" style={{ width: 32, height: 32 }}><Icon name="coach" size={16} /></span>
               <div className="grow"><strong style={{ fontSize: 12.5 }}>{tip.title}</strong><small>{tip.detail}</small></div>
-              <ArrowRight size={14} color="#98a5ba" />
+              <Icon name="arrow-right" size={16} style={{ color: "#98a5ba" }} />
             </button>
           ))}
         </div>
       </section>
+      <ConsentCard />
       <section className="pilot-card">
         <h2>Quick Actions</h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <button type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}><Clock size={15} /> Download Resume</button>
+          <button type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}><Icon name="clock" size={16} /> Download Resume</button>
           <button type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}
-            onClick={(event) => { event.stopPropagation(); overlay.openModal(shareProfileModal()); }}><Award size={15} /> Share Profile · QR</button>
+            onClick={(event) => { event.stopPropagation(); overlay.openModal(shareProfileModal()); }}><Icon name="offers" size={16} /> Share Profile · QR</button>
           <button type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}
-            onClick={(event) => { event.stopPropagation(); setTab(7); }}><Target size={15} /> Manage Preferences</button>
+            onClick={(event) => { event.stopPropagation(); setTab(7); }}><Icon name="targets" size={16} /> Manage Preferences</button>
           <button type="button" className="pilot-btn ghost" style={{ justifyContent: 'flex-start' }}
-            onClick={(event) => { event.stopPropagation(); requestDeletion(); }}><Lock size={15} /> Privacy &amp; Account</button>
+            onClick={(event) => { event.stopPropagation(); requestDeletion(); }}><Icon name="lock" size={16} /> Privacy &amp; Account</button>
         </div>
       </section>
     </aside> : null}

@@ -1,0 +1,516 @@
+/* ONE · The signed-out pages: the Infinity Loop sign-in in Momentum.
+ *
+ * Ported from the approved reference (design inventory unified/sign-in.html, sign-in-mobile.html)
+ * and its motion table (unified/SIGN-IN-NOTES.md). It restyles the AuthLayout frame
+ * (authLayout.tsx, authShowcase.tsx) and the cards inside it: sign-in, password reset, employer
+ * access and the legal placeholders. Everything is scoped under `.auth-split.si`, so the other
+ * pages that share .login-card (workspace chooser, session pages) keep their own look.
+ *
+ * Desktop: an always-dark brand panel whose right edge runs on the 12° slant, sticky beside the
+ * form column, with a light streak running up the edge. Phone (≤900px): a compact hero band with
+ * a slanted bottom edge, and the card overlapping it from 272px.
+ *
+ * Motion runs only under `prefers-reduced-motion: no-preference` AND when the script found
+ * motion allowed (.si-motion). The entrance runs once per mount, when .is-played lands.
+ * Reduced motion shows the final frame: stages lit, no comets, no streak.
+ */
+
+/* ---------- frame ---------- */
+.auth-split.si {
+  --si-x: clamp(32px, 5vw, 72px);
+  --si-slant: max(21.26vh, 136px); /* tan(12°) × the panel height */
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(500px, 580px);
+  grid-template-rows: minmax(100vh, auto);
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  overflow-x: clip;
+}
+
+/* The form side: airy in light, deep in dark, with the 12° hairlines. */
+.si-side { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.si-side::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(620px 460px at 88% 12%, rgba(24, 200, 232, .13), transparent 70%), radial-gradient(560px 420px at 78% 96%, rgba(43, 27, 184, .08), transparent 70%);
+}
+.si-side::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(102deg, transparent 0 118px, rgba(10, 16, 48, .035) 118px 119px);
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 30%, #000 70%, transparent);
+  mask-image: linear-gradient(180deg, transparent, #000 30%, #000 70%, transparent);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .si-side::before { background: radial-gradient(640px 480px at 86% 14%, rgba(30, 107, 255, .16), transparent 70%), radial-gradient(560px 420px at 80% 98%, rgba(24, 200, 232, .08), transparent 70%); }
+  :root:not([data-theme="light"]) .si-side::after { background: repeating-linear-gradient(102deg, transparent 0 118px, rgba(255, 255, 255, .028) 118px 119px); }
+}
+[data-theme="dark"] .si-side::before { background: radial-gradient(640px 480px at 86% 14%, rgba(30, 107, 255, .16), transparent 70%), radial-gradient(560px 420px at 80% 98%, rgba(24, 200, 232, .08), transparent 70%); }
+[data-theme="dark"] .si-side::after { background: repeating-linear-gradient(102deg, transparent 0 118px, rgba(255, 255, 255, .028) 118px 119px); }
+
+/* ---------- brand panel (always rich) ---------- */
+.auth-split.si .si-panel-wrap {
+  grid-column: 1;
+  grid-row: 1;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: block;
+  height: 100vh;
+  min-height: 640px;
+  margin-right: -40px;
+  padding: 0;
+  overflow: visible;
+  background: none;
+  color: #fff;
+}
+.si-panel {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  clip-path: polygon(0 0, 100% 0, calc(100% - var(--si-slant)) 100%, 0 100%);
+  isolation: isolate;
+  background:
+    radial-gradient(64% 70% at 40% 52%, rgba(43, 27, 184, .42) 0%, rgba(30, 107, 255, .12) 50%, transparent 74%),
+    radial-gradient(50% 45% at 8% 100%, rgba(24, 200, 232, .12), transparent 70%),
+    linear-gradient(160deg, #0B1236 0%, #070A18 58%, #050816 100%);
+}
+.si-slants {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(102deg, transparent 0 118px, rgba(255, 255, 255, .03) 118px 119px);
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 30%, #000 70%, transparent);
+  mask-image: linear-gradient(180deg, transparent, #000 30%, #000 70%, transparent);
+}
+
+/* The slanted edge and the light streak that runs up it. Drawn outside the clipped panel so the
+   hairline is not cut in half; rotating a 102.3%-tall line 12° about its top lands its foot
+   exactly on the panel's clip. */
+.si-edge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+  width: 1.5px;
+  height: 102.3%;
+  transform-origin: 50% 0;
+  transform: rotate(12deg);
+  background: linear-gradient(180deg, rgba(24, 200, 232, 0) 0%, rgba(30, 107, 255, .55) 35%, rgba(91, 75, 240, .45) 70%, rgba(43, 27, 184, 0) 100%);
+  pointer-events: none;
+}
+.si-edge-run {
+  position: absolute;
+  left: -.25px;
+  top: 100%;
+  width: 2px;
+  height: 7%;
+  border-radius: 2px;
+  background: #BFEFFF;
+  opacity: 0;
+}
+
+/* ∞ ribbons and particles */
+.si-ribbons { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.si-ribbons-m, .si-parts-m { display: none; }
+.si-rb { transform-box: view-box; transform: rotate(var(--rot)); }
+.si-parts { position: absolute; inset: 0; pointer-events: none; }
+.si-parts i { position: absolute; border-radius: 50%; background: #A9DCFF; opacity: var(--o); box-shadow: 0 0 6px rgba(120, 190, 255, .8); }
+
+/* Logo and the lens glow (the lens "o" sits at 19% × 41% of the vector lockup) */
+.si-brand { position: absolute; left: var(--si-x); top: 54px; z-index: 3; }
+.si-logo { position: relative; display: block; width: 190px; }
+.si-logo .brand-logo { position: relative; z-index: 1; }
+.si-glint {
+  position: absolute;
+  left: 19%;
+  top: 41%;
+  z-index: 2;
+  width: 96px;
+  height: 96px;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(159, 232, 255, .9) 0, rgba(63, 160, 255, .5) 22%, rgba(30, 107, 255, 0) 62%);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  opacity: .6;
+}
+.si-spec { position: absolute; left: 16.8%; top: 34.1%; z-index: 2; width: 14px; height: 14px; translate: -50% -50%; opacity: 0; pointer-events: none; }
+.si-spec::before, .si-spec::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 16px;
+  height: 1.6px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, #fff, transparent);
+  translate: -50% -50%;
+  box-shadow: 0 0 6px #9fe8ff;
+}
+.si-spec::after { rotate: 90deg; }
+
+/* Copy */
+.si-copy {
+  position: absolute;
+  left: var(--si-x);
+  top: clamp(150px, calc(50% - 218px), 300px);
+  z-index: 3;
+  /* The slant only bites low down, so the copy may run to 60% of the slant's reach. */
+  width: min(640px, calc(100% - var(--si-x) - var(--si-slant) * .6));
+}
+.si-stages { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 21px; margin: 0 0 24px; padding: 0; list-style: none; }
+.si-stg {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 13px;
+  color: rgba(214, 226, 255, .68);
+  font: 700 11.5px/1 var(--font-sans);
+  letter-spacing: .16em;
+  isolation: isolate;
+  transition: color var(--m-base) var(--e-out);
+}
+.si-stg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 7px;
+  transform: skewX(var(--slant));
+  border: 1px solid rgba(150, 180, 255, .2);
+  background: rgba(120, 150, 255, .06);
+  transition: background var(--m-base) var(--e-out), border-color var(--m-base), box-shadow var(--m-base) var(--e-out);
+}
+.si-stg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 7px;
+  transform: skewX(var(--slant));
+  background: var(--sg);
+  opacity: 0;
+  transition: opacity var(--m-base) var(--e-out);
+}
+.si-stg.on { color: #fff; }
+.si-stg.on::before { border-color: transparent; box-shadow: 0 0 22px -2px var(--sc), 0 6px 18px -8px var(--sc); }
+.si-stg.on::after { opacity: 1; }
+.si-stg[data-s="0"] { --sg: var(--grad-stage-learn); --sc: rgba(91, 75, 240, .75); }
+.si-stg[data-s="1"] { --sg: var(--grad-stage-prepare); --sc: rgba(30, 107, 255, .75); }
+.si-stg[data-s="2"] { --sg: var(--grad-stage-build); --sc: rgba(24, 200, 232, .7); }
+.si-stg[data-s="3"] { --sg: var(--grad-stage-grow); --sc: rgba(255, 138, 31, .7); }
+.si-stg[data-s="3"].on { color: #1B0C00; }
+/* White on the cyan end of the BUILD step falls to 2:1; deep ink keeps it above 4.5:1 across the fill. */
+.si-stg[data-s="2"].on { color: #031238; }
+.si-sep {
+  position: absolute;
+  right: -13px;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  margin-top: -2.5px;
+  border-radius: 1.5px;
+  transform: skewX(var(--slant));
+  background: rgba(150, 180, 255, .28);
+}
+
+.auth-split.si .si-title {
+  max-width: none;
+  margin: 0;
+  color: #fff;
+  font: 700 clamp(40px, 4.3vw, 62px)/1.04 var(--font-display);
+  letter-spacing: -.04em;
+}
+.si-ln { display: block; overflow: hidden; padding: 0 .04em .08em 0; margin-bottom: -.08em; }
+.si-ln > span { display: inline-block; }
+.si-g {
+  background: linear-gradient(100deg, #8DBBFF 0%, #3FD9F2 33.3%, #8DBBFF 41%, #FFFFFF 49%, #D9F8FF 53%, #8DBBFF 60%, #8DBBFF 66.6%, #3FD9F2 100%);
+  background-size: 300% 100%;
+  background-position: 0 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.si-lede { max-width: 520px; margin: 22px 0 0; color: rgba(226, 233, 255, .8); font-size: 17px; line-height: 1.55; }
+.si-lede b { color: #fff; font-weight: 600; }
+.si-proof { display: flex; flex-wrap: wrap; gap: 10px; margin: 28px 0 0; padding: 0; list-style: none; }
+.si-proof li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid rgba(130, 165, 255, .22);
+  background: rgba(79, 141, 255, .1);
+  color: #DCE6FF;
+  font: 500 13px var(--font-sans);
+}
+.si-proof svg { flex: none; color: #7FD8FF; }
+
+/* Footer: bottom-left of the panel on desktop, under the card on a phone. */
+.auth-split.si .auth-footer {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: end;
+  position: relative;
+  z-index: 3;
+  justify-content: flex-start;
+  gap: 8px 18px;
+  padding: 0 var(--si-x) 32px;
+  border: 0;
+  color: rgba(200, 212, 245, .7);
+  font-size: 12.5px;
+}
+.auth-split.si .auth-footer a { color: rgba(214, 226, 255, .82); }
+.auth-split.si .auth-footer a:hover, .auth-split.si .auth-footer a:focus-visible { color: #fff; }
+
+/* ---------- form side ---------- */
+.auth-split.si .auth-panel {
+  grid-column: 2;
+  grid-row: 1;
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  min-height: 100vh;
+  padding: 40px clamp(24px, 6vw, 88px) 40px 40px;
+  background: transparent;
+}
+.auth-split.si .auth-panel-main { flex: 0 1 auto; display: block; width: 100%; padding: 0; }
+
+/* The Momentum form card (fcard) */
+.auth-split.si .login-card {
+  position: relative;
+  overflow: hidden;
+  width: min(452px, 100%);
+  padding: 34px 38px 26px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-hero);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-pop);
+}
+.auth-split.si .login-card::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 4px; background: var(--grad); }
+.auth-split.si .auth-eyebrow { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--brand-ink); font: 700 11px var(--font-sans); letter-spacing: .14em; text-transform: uppercase; }
+.auth-split.si .auth-eyebrow .one-icon { width: 12px; height: 12px; }
+.auth-split.si .login-card h1 { margin: 10px 0 4px; font: 700 30px/1.15 var(--font-display); letter-spacing: -.03em; color: var(--text); }
+.auth-split.si .auth-subtitle { margin: 0 0 4px; color: var(--text-2); font-size: 14.5px; line-height: 1.5; }
+.auth-split.si .login-form { gap: 7px; margin-top: 18px; }
+.auth-split.si .login-form label { color: var(--text-2); font: 600 12.5px var(--font-sans); }
+.auth-split.si .login-form input,
+.auth-split.si .login-form select,
+.auth-split.si .login-form textarea {
+  min-height: var(--input-h);
+  margin: 0 0 11px;
+  padding: 10px 14px;
+  border: 1.5px solid var(--line-2);
+  border-radius: var(--r-2xl);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 14.5px;
+  box-shadow: none;
+  transition: border-color var(--m-base) var(--e-out), box-shadow var(--m-base) var(--e-out);
+}
+.auth-split.si .login-form :is(input, select, textarea):focus-visible { outline: none; border-color: var(--brand); box-shadow: var(--ring-focus); }
+.auth-split.si .login-form :is(input, select, textarea)[aria-invalid="true"] { border-color: var(--danger); }
+.auth-split.si .login-form :is(input, select, textarea):disabled { border-color: var(--line); background: var(--surface-2); color: var(--text-3); }
+.auth-split.si .si-input { position: relative; display: block; }
+.auth-split.si .si-input > .si-input-icon { position: absolute; left: 15px; top: 16px; z-index: 1; color: var(--text-3); pointer-events: none; }
+.auth-split.si .si-input input { padding-left: 42px; }
+.auth-split.si .login-form .password-toggle { top: 5px; right: 5px; color: var(--text-3); }
+.auth-split.si .login-form .password-toggle:hover { color: var(--brand); background: transparent; }
+.auth-split.si .login-label-row a { font-size: 13px; }
+
+/* Primary action: the Momentum gradient button with the 12° shine and the arrow nudge. */
+.auth-split.si .login-card .login-form button[type="submit"] {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 52px;
+  margin-top: 10px;
+  border: 0;
+  border-radius: var(--r-2xl);
+  background: var(--grad);
+  color: #fff;
+  font: 600 15.5px var(--font-sans);
+  box-shadow: 0 8px 20px -10px rgba(30, 107, 255, .8);
+}
+.auth-split.si .login-card .login-form button[type="submit"]:hover:not(:disabled) {
+  background: var(--grad);
+  transform: translateY(-1px);
+  box-shadow: 0 12px 26px -10px rgba(30, 107, 255, .9);
+  filter: saturate(1.08) brightness(1.04);
+}
+.auth-split.si .login-card .login-form button[type="submit"]:active:not(:disabled) { transform: translateY(0) scale(.97); transition-duration: var(--m-press); }
+.auth-split.si .login-card .login-form button[type="submit"]:disabled { background: var(--surface-3); color: var(--text-2); box-shadow: none; filter: none; cursor: not-allowed; }
+.auth-split.si .si-go::after {
+  content: '';
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  left: 0;
+  width: 46%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .42), transparent);
+  transform: skewX(var(--slant));
+  translate: -140% 0;
+  pointer-events: none;
+}
+.auth-split.si .si-go .si-go-arrow { transition: translate var(--m-micro) var(--e-out); }
+.auth-split.si .si-go:hover .si-go-arrow { translate: 2px 0; }
+
+.auth-split.si .login-card > button.secondary {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 16px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-2xl);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+}
+.auth-split.si .login-card > button.secondary:hover:not(:disabled) { border-color: var(--brand); transform: translateY(-1px); }
+.auth-split.si .auth-boundary { margin: 14px 0 0; color: var(--text-2); }
+.auth-split.si .auth-boundary.auth-error { border-color: color-mix(in srgb, var(--danger) 30%, transparent); border-radius: var(--r-xl); }
+.auth-split.si .auth-footnote { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 6px; margin: 18px 0 0; color: var(--text-3); font-size: 13px; }
+.auth-split.si .auth-footnote a { display: inline-flex; align-items: center; gap: 4px; }
+.auth-split.si .auth-footnote a .one-icon { width: 13px; height: 13px; transition: translate var(--m-micro) var(--e-out); }
+.auth-split.si .auth-footnote a:hover .one-icon { translate: 2px 0; }
+.auth-split.si .auth-privacy {
+  display: block;
+  margin: 18px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  color: var(--text-3);
+  font-size: 12px;
+  line-height: 1.45;
+  letter-spacing: -.005em;
+  text-align: center;
+  text-wrap: balance;
+}
+.auth-split.si .auth-privacy .one-icon { display: inline-block; width: 14px; height: 14px; margin-right: 6px; vertical-align: -2px; color: var(--brand); }
+
+/* ---------- phone: compact ∞ hero band, card overlapping it ---------- */
+@media (max-width: 900px) {
+  .auth-split.si { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; }
+  .auth-split.si .si-panel-wrap { grid-row: 1; position: relative; top: auto; height: 350px; min-height: 0; margin: 0; }
+  .si-panel {
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 42px), 0 100%);
+    background:
+      radial-gradient(80% 90% at 46% 50%, rgba(43, 27, 184, .45) 0%, rgba(30, 107, 255, .12) 52%, transparent 76%),
+      radial-gradient(50% 50% at 0% 100%, rgba(24, 200, 232, .14), transparent 70%),
+      linear-gradient(160deg, #0B1236 0%, #070A18 62%, #050816 100%);
+  }
+  .si-edge { display: none; }
+  .si-ribbons-d, .si-parts-d { display: none; }
+  .si-ribbons-m, .si-parts-m { display: block; }
+  .si-side::before { background: radial-gradient(300px 260px at 90% 70%, rgba(24, 200, 232, .12), transparent 70%), radial-gradient(280px 220px at 0% 100%, rgba(43, 27, 184, .08), transparent 70%); }
+  .si-brand { left: 22px; top: 22px; }
+  /* The lockup keeps its byline at 140px, the smallest size the byline reads at. */
+  .si-logo { width: 140px; }
+  .si-logo .brand-logo { width: 140px !important; height: auto !important; }
+  .si-glint { width: 70px; height: 70px; }
+  .si-spec { width: 10px; height: 10px; }
+  .si-spec::before, .si-spec::after { width: 11px; }
+  .si-copy { left: 22px; top: 112px; width: calc(100% - 44px); }
+  .si-stages { gap: 6px 15px; margin-bottom: 16px; }
+  .si-stg { height: 24px; padding: 0 9px; font-size: 10px; letter-spacing: .13em; }
+  .si-sep { right: -10px; width: 4px; height: 4px; margin-top: -2px; }
+  .auth-split.si .si-title { font-size: 31px; line-height: 1.08; letter-spacing: -.035em; }
+  .si-lede, .si-proof { display: none; }
+  .auth-split.si .auth-panel { grid-column: 1; grid-row: 2; display: block; min-height: 0; margin-top: -78px; padding: 0 14px 20px; }
+  .auth-split.si .auth-panel-main { max-width: 520px; margin: 0 auto; }
+  .auth-split.si .login-card { width: 100%; padding: 24px 22px 16px; border-radius: 24px; }
+  .auth-split.si .login-card h1 { margin: 8px 0 2px; font-size: 24px; }
+  .auth-split.si .login-form { margin-top: 14px; }
+  .auth-split.si .login-form input { min-height: 46px; }
+  .auth-split.si .si-input > .si-input-icon { top: 15px; }
+  .auth-split.si .login-card .login-form button[type="submit"] { min-height: 50px; font-size: 15px; }
+  .auth-split.si .auth-privacy { padding-top: 12px; margin-top: 14px; font-size: 11.5px; }
+  .auth-split.si .auth-footer { grid-column: 1; grid-row: 3; align-self: auto; justify-content: center; padding: 6px 16px 22px; color: var(--text-3); text-align: center; }
+  .auth-split.si .auth-footer a { color: var(--text-2); }
+  .auth-split.si .auth-footer a:hover, .auth-split.si .auth-footer a:focus-visible { color: var(--brand-ink); }
+}
+
+/* ---------- motion ---------- */
+@keyframes siRiseSm { from { opacity: 0; translate: 0 8px; } }
+@keyframes siFade { from { opacity: 0; } }
+@keyframes siSlant { from { opacity: 0; translate: 14px 64px; } }
+@keyframes siLineUp { from { transform: translateY(108%); } }
+@keyframes siRibIn { from { opacity: 0; scale: .94; } }
+@keyframes siSheen { from { background-position: 100% 0; } to { background-position: 0 0; } }
+@keyframes siSway { from { transform: rotate(var(--rot)); } to { transform: rotate(calc(var(--rot) + 2.4deg)) scale(1.015); } }
+@keyframes siFlow { to { stroke-dashoffset: -100; } }
+@keyframes siCometH { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -100; } }
+@keyframes siCometT { from { stroke-dashoffset: 7; } to { stroke-dashoffset: -93; } }
+@keyframes siFloat { 0% { transform: translate3d(0, 0, 0); opacity: 0; } 14% { opacity: var(--o); } 80% { opacity: var(--o); } 100% { transform: translate3d(16px, -120px, 0); opacity: 0; } }
+@keyframes siGlint { 0%, 100% { opacity: .55; scale: .86; } 50% { opacity: 1; scale: 1.12; } }
+@keyframes siIgnite { 0% { opacity: 0; scale: .2; } 55% { opacity: 1; scale: 1.7; } 100% { opacity: .55; scale: .86; } }
+@keyframes siSpec { 0%, 82%, 100% { opacity: 0; scale: .2; } 88% { opacity: .95; scale: 1; } 95% { opacity: 0; scale: .5; } }
+@keyframes siShine { 0%, 80% { translate: -140% 0; } 96%, 100% { translate: 260% 0; } }
+@keyframes siNudge { 0%, 84%, 100% { translate: 0 0; } 89% { translate: 4px 0; } 94% { translate: 0 0; } 97% { translate: 2px 0; } }
+@keyframes siEdgeRun { 0% { top: 100%; opacity: 0; } 4% { opacity: .7; } 22% { top: -7%; opacity: .7; } 23%, 100% { top: -7%; opacity: 0; } }
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Pre-boot: animated layers stay hidden until the entrance starts, so the static frame never flashes first. */
+  .si-motion:not(.is-played) :is(.en, .login-card) { opacity: 0; }
+
+  /* ambient loops */
+  .si-motion .si-rb { animation: siSway 18s var(--e-inout) infinite alternate; }
+  .si-motion .si-rb1 { animation-duration: 14s; }
+  .si-motion .si-rb2 { animation-duration: 22s; animation-direction: alternate-reverse; }
+  .si-motion .si-rb3 { animation-duration: 26s; }
+  .si-motion .si-flow { animation: siFlow var(--dur) linear infinite; }
+  .si-motion .si-c1.si-h { animation: siCometH var(--loop-comet) linear infinite; }
+  .si-motion .si-c1.si-t { animation: siCometT var(--loop-comet) linear infinite; }
+  .si-motion .si-c2.si-h { animation: siCometH var(--loop-comet-2) linear -4s infinite; }
+  .si-motion .si-c2.si-t { animation: siCometT var(--loop-comet-2) linear -4s infinite; }
+  .si-motion .si-parts i { animation: siFloat var(--t) linear var(--dl) infinite; }
+  .si-motion .si-glint { animation: siGlint var(--loop-breathe) ease-in-out infinite; }
+  .si-motion .si-spec { animation: siSpec 5s var(--e-out) 2.2s infinite both; }
+  .si-motion .si-edge-run { animation: siEdgeRun 9s linear infinite; }
+
+  /* entrance, once per mount */
+  .si-motion.is-played .si-ribbons { animation: siRibIn 2.2s var(--e-out) backwards; transform-origin: 48% 50%; }
+  .si-motion.is-played .si-comets { animation: siFade 1.2s var(--e-out) 1.1s backwards; }
+  .si-motion.is-played .si-parts { animation: siFade 1.6s var(--e-out) .3s backwards; }
+  .si-motion.is-played .si-brand { animation: siFade 800ms var(--e-out) 150ms backwards; }
+  .si-motion.is-played .si-glint { animation: siIgnite 1100ms var(--e-out) 700ms backwards, siGlint var(--loop-breathe) ease-in-out 1.8s infinite; }
+  .si-motion.is-played :is(.si-stg, .si-sep) { animation: siRiseSm var(--m-base) var(--e-out) backwards; animation-delay: calc(260ms + var(--k) * var(--st-tight)); }
+  .si-motion.is-played .si-ln > span { animation: siLineUp var(--m-slow) var(--e-out) backwards; animation-delay: calc(360ms + var(--k) * 90ms); }
+  .si-motion.is-played .si-ln > .si-g { animation: siLineUp var(--m-slow) var(--e-out) 540ms backwards, siSheen 1.8s var(--e-inout) 1.5s both; }
+  .si-motion.is-played .si-lede { animation: siRiseSm var(--m-enter) var(--e-out) 760ms backwards; }
+  .si-motion.is-played .si-proof li { animation: siRiseSm var(--m-base) var(--e-out) backwards; animation-delay: calc(900ms + var(--k) * var(--st)); }
+  .si-motion.is-played .auth-footer { animation: siFade 800ms var(--e-out) 1.2s backwards; }
+  .si-motion.is-played .si-edge { animation: siFade 1.2s var(--e-out) .4s backwards; }
+  .si-motion.is-played .login-card { animation: siSlant var(--m-slow) var(--e-out) 300ms backwards; }
+  .si-motion.is-played .login-card > * { animation: siRiseSm var(--m-base) var(--e-out) backwards; animation-delay: calc(620ms + var(--k, 0) * var(--st)); }
+  .si-motion.is-played .si-go::after { animation: siShine var(--loop-nudge) var(--e-inout) 3.9s infinite; }
+  .si-motion.is-played .si-go .si-go-arrow { animation: siNudge var(--loop-nudge) var(--e-out) 3.9s infinite; }
+}
+/* Card rows rise in a 70ms stagger, as the approved card does. */
+.auth-split.si .login-card > :nth-child(1) { --k: 0; }
+.auth-split.si .login-card > :nth-child(2) { --k: 1; }
+.auth-split.si .login-card > :nth-child(3) { --k: 2; }
+.auth-split.si .login-card > :nth-child(4) { --k: 3; }
+.auth-split.si .login-card > :nth-child(5) { --k: 5; }
+.auth-split.si .login-card > :nth-child(6) { --k: 7; }
+.auth-split.si .login-card > :nth-child(7) { --k: 9; }
+.auth-split.si .login-card > :nth-child(n + 8) { --k: 11; }
+
+@media (prefers-reduced-motion: reduce) {
+  .si-glint { opacity: .75; }
+  .si-spec, .si-comets, .si-edge-run { display: none; }
+}

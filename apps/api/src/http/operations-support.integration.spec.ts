@@ -123,14 +123,16 @@ describe('authorisation', () => {
   it('returns 403 to an ACTIVE institution admin for every route', async () => {
     const admin = await member('INSTITUTION_ADMIN');
     const calls = [
-      api().get('/api/v1/operations/support/policy').set(auth(admin.userId)),
-      api().get('/api/v1/operations/support/cases').set(auth(admin.userId)),
-      api().post('/api/v1/operations/support/cases').set(auth(admin.userId)).send(phoneCall()),
-      api().get('/api/v1/operations/support/accounts?q=college').set(auth(admin.userId)),
-      api().get('/api/v1/operations/support/accounts/' + admin.userId).set(auth(admin.userId)),
-      api().post('/api/v1/operations/support/accounts/' + admin.userId + '/contact-reveal').set(auth(admin.userId)).send({ reasonCode: 'ACCOUNT_RECOVERY' }),
+      () => api().get('/api/v1/operations/support/policy').set(auth(admin.userId)),
+      () => api().get('/api/v1/operations/support/cases').set(auth(admin.userId)),
+      () => api().post('/api/v1/operations/support/cases').set(auth(admin.userId)).send(phoneCall()),
+      () => api().get('/api/v1/operations/support/accounts?q=college').set(auth(admin.userId)),
+      () => api().get('/api/v1/operations/support/accounts/' + admin.userId).set(auth(admin.userId)),
+      () => api().post('/api/v1/operations/support/accounts/' + admin.userId + '/contact-reveal').set(auth(admin.userId)).send({ reasonCode: 'ACCOUNT_RECOVERY' }),
     ];
-    for (const response of await Promise.all(calls)) {
+    // One at a time: supertest starts the shared server when a request is built, so each is built only when it is sent; several at once dropped a connection (ECONNRESET) on CI.
+    for (const pending of calls) {
+      const response = await pending();
       expect(response.status).toBe(403);
       expect(response.body.error).toMatchObject({ code: 'FORBIDDEN', correlationId: expect.any(String) });
     }

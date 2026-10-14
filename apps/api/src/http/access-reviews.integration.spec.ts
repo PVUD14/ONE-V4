@@ -240,16 +240,20 @@ describe('who may run an access review', () => {
 
   it('validates input before anything is written', async () => {
     const cases = [
-      api().post(base).set(auth(reviewerOne)).send({ reasonCode: 'BECAUSE' }),
-      api().post(base).set(auth(reviewerOne)).send({ reasonCode: 'QUARTERLY_REVIEW', extra: 1 }),
-      api().post(base).set(auth(reviewerOne)).send({ reasonCode: 'QUARTERLY_REVIEW', note: 'x'.repeat(501) }),
-      api().get(base + '?limit=0').set(auth(reviewerOne)),
-      api().get(base + '?limit=201').set(auth(reviewerOne)),
-      api().get(base + '?cursor=not-a-cursor').set(auth(reviewerOne)),
-      api().get(base + '?unknown=1').set(auth(reviewerOne)),
-      api().get(base + '/not-a-uuid').set(auth(reviewerOne)),
+      () => api().post(base).set(auth(reviewerOne)).send({ reasonCode: 'BECAUSE' }),
+      () => api().post(base).set(auth(reviewerOne)).send({ reasonCode: 'QUARTERLY_REVIEW', extra: 1 }),
+      () => api().post(base).set(auth(reviewerOne)).send({ reasonCode: 'QUARTERLY_REVIEW', note: 'x'.repeat(501) }),
+      () => api().get(base + '?limit=0').set(auth(reviewerOne)),
+      () => api().get(base + '?limit=201').set(auth(reviewerOne)),
+      () => api().get(base + '?cursor=not-a-cursor').set(auth(reviewerOne)),
+      () => api().get(base + '?unknown=1').set(auth(reviewerOne)),
+      () => api().get(base + '/not-a-uuid').set(auth(reviewerOne)),
     ];
-    for (const response of await Promise.all(cases)) expect(response.status, JSON.stringify(response.body)).toBe(400);
+    // One at a time: supertest starts the shared server when a request is built, so each is built only when it is sent; eight at once dropped a connection (ECONNRESET) on CI.
+    for (const pending of cases) {
+      const response = await pending();
+      expect(response.status, JSON.stringify(response.body)).toBe(400);
+    }
     expect((await pool.query('SELECT count(*)::int AS n FROM access_review_campaigns')).rows[0].n).toBe(0);
     expect((await api().get(base + '/' + randomUUID()).set(auth(reviewerOne))).status).toBe(404);
   });

@@ -195,18 +195,20 @@ describe('authorisation', () => {
   it('returns 403 to an ACTIVE institution admin for every route', async () => {
     const id = randomUUID();
     const calls = [
-      api().get(base + '/policy').set(auth(collegeAdmin.userId)),
-      api().get(base).set(auth(collegeAdmin.userId)),
-      api().post(base).set(auth(collegeAdmin.userId)).send(breach()),
-      api().get(`${base}/${id}`).set(auth(collegeAdmin.userId)),
-      api().post(`${base}/${id}/transition`).set(auth(collegeAdmin.userId)).send({ toState: 'CONTAINED', reasonCode: 'ACCESS_PATH_CLOSED' }),
-      api().post(`${base}/${id}/board-notification`).set(auth(collegeAdmin.userId)).send({ notifiedAt: hoursAgo(1), reasonCode: 'BOARD_REPORT_FILED' }),
-      api().get(comms + '/policy').set(auth(collegeAdmin.userId)),
-      api().get(comms + '/templates').set(auth(collegeAdmin.userId)),
-      api().post(comms + '/notices').set(auth(collegeAdmin.userId)).send({ incidentId: id, templateId: id, reasonCode: 'INITIAL_NOTICE' }),
-      api().post(`${comms}/notices/${id}/approve`).set(auth(collegeAdmin.userId)).send({ reasonCode: 'APPROVED_FOR_SEND' }),
+      () => api().get(base + '/policy').set(auth(collegeAdmin.userId)),
+      () => api().get(base).set(auth(collegeAdmin.userId)),
+      () => api().post(base).set(auth(collegeAdmin.userId)).send(breach()),
+      () => api().get(`${base}/${id}`).set(auth(collegeAdmin.userId)),
+      () => api().post(`${base}/${id}/transition`).set(auth(collegeAdmin.userId)).send({ toState: 'CONTAINED', reasonCode: 'ACCESS_PATH_CLOSED' }),
+      () => api().post(`${base}/${id}/board-notification`).set(auth(collegeAdmin.userId)).send({ notifiedAt: hoursAgo(1), reasonCode: 'BOARD_REPORT_FILED' }),
+      () => api().get(comms + '/policy').set(auth(collegeAdmin.userId)),
+      () => api().get(comms + '/templates').set(auth(collegeAdmin.userId)),
+      () => api().post(comms + '/notices').set(auth(collegeAdmin.userId)).send({ incidentId: id, templateId: id, reasonCode: 'INITIAL_NOTICE' }),
+      () => api().post(`${comms}/notices/${id}/approve`).set(auth(collegeAdmin.userId)).send({ reasonCode: 'APPROVED_FOR_SEND' }),
     ];
-    for (const response of await Promise.all(calls)) {
+    // One at a time: supertest starts the shared server when a request is built, so each is built only when it is sent; ten at once dropped a connection (ECONNRESET) on CI.
+    for (const pending of calls) {
+      const response = await pending();
       expect(response.status).toBe(403);
       expect(response.body.error).toMatchObject({ code: 'FORBIDDEN', correlationId: expect.any(String) });
     }

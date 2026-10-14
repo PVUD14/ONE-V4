@@ -167,13 +167,15 @@ describe('every high-risk action refuses to run without an approval', () => {
     const { holdId } = await hold(admin.userId);
 
     const calls = [
-      suspend(admin, organizationId, { reasonCode: 'POLICY_VIOLATION' }),
-      api().post('/api/v1/operations/feature-flags/' + flagKey + '/state').set(auth(admin.userId)).send({ enabled: true, reasonCode: 'PILOT_ROLLOUT' }),
-      api().post('/api/v1/operations/outbox/backlog/supersede').set(auth(admin.userId)).send({ reasonCode: 'PRE_DISPATCHER_BACKLOG', olderThan: '2000-01-01T00:00:00.000Z' }),
-      api().post('/api/v1/operations/privacy/holds/' + holdId + '/release').set(auth(admin.userId)).send({ reasonCode: 'CASE_CLOSED' }),
-      api().post('/api/v1/operations/staff/' + security.membershipId + '/capabilities').set(auth(admin.userId)).send({ capability: 'CONTENT_PUBLISH', reasonCode: 'NEW_RESPONSIBILITY' }),
+      () => suspend(admin, organizationId, { reasonCode: 'POLICY_VIOLATION' }),
+      () => api().post('/api/v1/operations/feature-flags/' + flagKey + '/state').set(auth(admin.userId)).send({ enabled: true, reasonCode: 'PILOT_ROLLOUT' }),
+      () => api().post('/api/v1/operations/outbox/backlog/supersede').set(auth(admin.userId)).send({ reasonCode: 'PRE_DISPATCHER_BACKLOG', olderThan: '2000-01-01T00:00:00.000Z' }),
+      () => api().post('/api/v1/operations/privacy/holds/' + holdId + '/release').set(auth(admin.userId)).send({ reasonCode: 'CASE_CLOSED' }),
+      () => api().post('/api/v1/operations/staff/' + security.membershipId + '/capabilities').set(auth(admin.userId)).send({ capability: 'CONTENT_PUBLISH', reasonCode: 'NEW_RESPONSIBILITY' }),
     ];
-    for (const response of await Promise.all(calls)) {
+    // One at a time: supertest starts the shared server when a request is built, so each is built only when it is sent; several at once dropped a connection (ECONNRESET) on CI.
+    for (const pending of calls) {
+      const response = await pending();
       expect(response.status).toBe(403);
       expect(response.body.error).toMatchObject({ code: 'APPROVAL_REQUIRED', correlationId: expect.any(String) });
     }

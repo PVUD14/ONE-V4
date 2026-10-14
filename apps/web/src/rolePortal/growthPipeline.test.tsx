@@ -70,6 +70,10 @@ describe('the pipeline on a lead', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Move' }));
     expect(await screen.findByText(/stage changed since you opened this lead/)).toBeInTheDocument();
     await waitFor(() => expect(loads).toBe(2));
+    // The reload it caused must not wipe the explanation: a fast reload used to clear it before anyone could read it.
+    // Before the reload "Proposal shared" is only a menu option; after it, it is also the stage shown.
+    await waitFor(() => expect(screen.getAllByText('Proposal shared')).toHaveLength(2));
+    expect(screen.getByText(/stage changed since you opened this lead/)).toBeInTheDocument();
   });
 
   it('asks for the handoff with the reported reference and the chosen contacts', async () => {

@@ -102,6 +102,8 @@ export function LeadPipelinePanel({ leadId, token, contacts, onChanged }: {
   const [busy, setBusy] = useState(false);
   const [reload, setReload] = useState(0);
   const key = useRef(crypto.randomUUID());
+  // A reload caused by a stage change must keep the message that explains it; any other reload clears it.
+  const keepMessage = useRef(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -109,7 +111,8 @@ export function LeadPipelinePanel({ leadId, token, contacts, onChanged }: {
       .then((result) => {
         // An answer without the pipeline's shape is treated like no answer: nothing is guessed.
         if (!Array.isArray(result.nextStages) || !Array.isArray(result.handoffRequests) || !result.vocabulary) throw new Error('malformed pipeline');
-        setPipeline(result); setError('');
+        setPipeline(result);
+        if (keepMessage.current) keepMessage.current = false; else setError('');
       })
       .catch((cause: unknown) => { if (!controller.signal.aborted) setError(pipelineError(cause, 'The pipeline could not be loaded.')); });
     return () => controller.abort();
@@ -129,7 +132,7 @@ export function LeadPipelinePanel({ leadId, token, contacts, onChanged }: {
       onChanged();
     } catch (cause) {
       setError(pipelineError(cause, 'The change could not be saved.'));
-      if (cause instanceof ApiRequestError && cause.code === 'GROWTH_STAGE_CHANGED') setReload((value) => value + 1);
+      if (cause instanceof ApiRequestError && cause.code === 'GROWTH_STAGE_CHANGED') { keepMessage.current = true; setReload((value) => value + 1); }
     } finally {
       setBusy(false);
     }
